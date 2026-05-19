@@ -1,0 +1,19 @@
+site:
+  power_mw: 50.0
+  energy_mwh: 100.0
+  eta_charge: 0.95
+  eta_discharge: 0.95
+  soc_min_frac: 0.05
+  soc_max_frac: 0.95
+  soc_initial_frac: 0.5
+
+prices:
+  kind: synthetic
+  days: 7
+  peak_price: 150.0
+  trough_price: 20.0
+  start: "2025-01-01"
+
+timestep_minutes: 30
+output_dir: runs
+seed: 0
