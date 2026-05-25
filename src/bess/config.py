@@ -38,12 +38,41 @@ PriceConfig = Annotated[
 ]
 
 
+class DcLowServiceConfig(BaseModel):
+    kind: Literal["dc_low"] = "dc_low"
+    path: Path
+    timestamp_column: str = "timestamp"
+    price_column: str = "price"
+    response_minutes: int = Field(default=15, gt=0)
+
+
+class DcHighServiceConfig(BaseModel):
+    kind: Literal["dc_high"] = "dc_high"
+    path: Path
+    timestamp_column: str = "timestamp"
+    price_column: str = "price"
+    response_minutes: int = Field(default=15, gt=0)
+
+
+ServiceConfig = Annotated[
+    DcLowServiceConfig | DcHighServiceConfig,
+    Field(discriminator="kind"),
+]
+
+
+class EfaConfig(BaseModel):
+    block_hours: int = Field(default=4, gt=0)
+    block_start_hour: int = Field(default=23, ge=0, lt=24)
+
+
 class ScenarioConfig(BaseModel):
     site: SiteSpec
     prices: PriceConfig
     timestep_minutes: int = Field(default=30, gt=0)
     output_dir: Path = Path("runs")
     seed: int = 0
+    services: list[ServiceConfig] = Field(default_factory=list)
+    efa: EfaConfig = Field(default_factory=EfaConfig)
 
 
 def load_scenario(path: Path | str) -> ScenarioConfig:

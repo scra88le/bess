@@ -35,6 +35,8 @@ def run(
     result = run_scenario(config)
 
     typer.echo(f"\nRun written to: {result.run_dir}")
+    if result.bid_curve is not None:
+        typer.echo(f"DC bid curve:   {result.run_dir / 'bid_curve.parquet'}")
     typer.echo("\nKPIs")
     typer.echo("-" * 40)
     for key, value in result.summary.items():

@@ -17,6 +17,12 @@ TELEMETRY_COLUMNS = [
     "soc_mwh",
     "soc_frac",
     "revenue_period",
+    "c_dc_low_committed_mw",
+    "c_dc_high_committed_mw",
+    "dc_low_price",
+    "dc_high_price",
+    "revenue_dc_low_period",
+    "revenue_dc_high_period",
     "clipped",
 ]
 
@@ -30,6 +36,12 @@ class TelemetryRow:
     soc_mwh: float
     soc_frac: float
     revenue_period: float
+    c_dc_low_committed_mw: float
+    c_dc_high_committed_mw: float
+    dc_low_price: float
+    dc_high_price: float
+    revenue_dc_low_period: float
+    revenue_dc_high_period: float
     clipped: bool
 
 
@@ -43,6 +55,10 @@ class TelemetryWriter:
         price: float,
         step: StepResult,
         timestep_hours: float,
+        c_dc_low: float = 0.0,
+        c_dc_high: float = 0.0,
+        dc_low_price: float = 0.0,
+        dc_high_price: float = 0.0,
     ) -> None:
         self._rows.append(
             TelemetryRow(
@@ -53,6 +69,12 @@ class TelemetryWriter:
                 soc_mwh=step.soc_mwh,
                 soc_frac=step.soc_frac,
                 revenue_period=price * step.power_actual_mw * timestep_hours,
+                c_dc_low_committed_mw=c_dc_low,
+                c_dc_high_committed_mw=c_dc_high,
+                dc_low_price=dc_low_price,
+                dc_high_price=dc_high_price,
+                revenue_dc_low_period=c_dc_low * dc_low_price * timestep_hours,
+                revenue_dc_high_period=c_dc_high * dc_high_price * timestep_hours,
                 clipped=step.clipped,
             )
         )
@@ -77,8 +99,22 @@ def summarise_kpis(
     throughput = energy_discharged + energy_charged
     usable_mwh = (site.soc_max_frac - site.soc_min_frac) * site.energy_mwh
     cycles = throughput / (2 * usable_mwh) if usable_mwh > 0 else 0.0
+    revenue_arbitrage = float(telemetry["revenue_period"].sum())
+    revenue_dc_low = (
+        float(telemetry["revenue_dc_low_period"].sum())
+        if "revenue_dc_low_period" in telemetry.columns
+        else 0.0
+    )
+    revenue_dc_high = (
+        float(telemetry["revenue_dc_high_period"].sum())
+        if "revenue_dc_high_period" in telemetry.columns
+        else 0.0
+    )
     return {
-        "total_revenue_gbp": float(telemetry["revenue_period"].sum()),
+        "total_revenue_gbp": revenue_arbitrage + revenue_dc_low + revenue_dc_high,
+        "revenue_arbitrage_gbp": revenue_arbitrage,
+        "revenue_dc_low_gbp": revenue_dc_low,
+        "revenue_dc_high_gbp": revenue_dc_high,
         "energy_discharged_mwh": float(energy_discharged),
         "energy_charged_mwh": float(energy_charged),
         "throughput_mwh": float(throughput),

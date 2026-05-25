@@ -23,11 +23,41 @@ def load_prices(config: PriceConfig, timestep_minutes: int) -> pd.Series:
 
 
 def load_csv(path: Path, timestamp_column: str, price_column: str) -> pd.Series:
+    return _read_price_csv(path, timestamp_column, price_column, name="price")
+
+
+def _read_price_csv(
+    path: Path, timestamp_column: str, price_column: str, name: str
+) -> pd.Series:
     df = pd.read_csv(path)
     ts = pd.to_datetime(df[timestamp_column])
-    series = pd.Series(df[price_column].astype(float).to_numpy(), index=ts, name="price")
+    series = pd.Series(df[price_column].astype(float).to_numpy(), index=ts, name=name)
     series.index.name = "timestamp"
     return series.sort_index()
+
+
+def load_service_price_csv(
+    path: Path, timestamp_column: str, price_column: str, name: str
+) -> pd.Series:
+    """Load a service (e.g. DC) price CSV with the same shape as wholesale prices."""
+    return _read_price_csv(path, timestamp_column, price_column, name=name)
+
+
+def align_to_index(series: pd.Series, energy_index: pd.DatetimeIndex, label: str) -> pd.Series:
+    """Confirm `series` shares `energy_index` exactly; raise if not.
+
+    The optimiser needs one service price per timestep aligned 1-1 with the energy series.
+    """
+    if not series.index.equals(energy_index):
+        missing = energy_index.difference(series.index)
+        extra = series.index.difference(energy_index)
+        raise ValueError(
+            f"{label} price index does not match energy price index "
+            f"(missing={len(missing)}, extra={len(extra)}, "
+            f"first_missing={missing[0] if len(missing) else None}, "
+            f"first_extra={extra[0] if len(extra) else None})"
+        )
+    return series
 
 
 def synthetic_sine(

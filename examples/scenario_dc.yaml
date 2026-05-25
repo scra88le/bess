@@ -1,0 +1,34 @@
+site:
+  power_mw: 50.0
+  energy_mwh: 100.0
+  eta_charge: 0.95
+  eta_discharge: 0.95
+  soc_min_frac: 0.05
+  soc_max_frac: 0.95
+  soc_initial_frac: 0.5
+
+prices:
+  kind: csv
+  path: examples/prices.csv
+  timestamp_column: timestamp
+  price_column: price
+
+services:
+  - kind: dc_low
+    path: examples/dc_low_prices.csv
+    timestamp_column: timestamp
+    price_column: price
+    response_minutes: 15
+  - kind: dc_high
+    path: examples/dc_high_prices.csv
+    timestamp_column: timestamp
+    price_column: price
+    response_minutes: 15
+
+efa:
+  block_hours: 4
+  block_start_hour: 23
+
+timestep_minutes: 60
+output_dir: runs
+seed: 0
