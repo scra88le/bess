@@ -12,6 +12,8 @@ thermal:
   ambient_temp_c: 20.0
   thermal_mass: 15000          # J/C equivalent
   hvac_cooling_rate_c_per_sec: 0.05
+  optimal_temp_c: 20.0         # HVAC target; aux load scales with deviation above this
+  max_cell_temp_c: 60.0        # hard thermal cutoff (trip to 0 MW at/above this)
 
 soc_non_linearity:
   lower_threshold: 0.10
@@ -28,6 +30,12 @@ grid_constraints:
 
 warranty:
   max_equivalent_full_cycles: 3000
+
+# Capacity-fade rates. cycle_loss_per_efc defaults to reaching ~20% fade at the
+# warranty's max EFC if omitted; calendar_loss_per_year is fade from pure aging.
+degradation:
+  cycle_loss_per_efc: 0.0000667   # ~0.20 fade over 3000 EFC
+  calendar_loss_per_year: 0.02
 
 # Optional: planned maintenance windows that mask dispatch to 0 MW.
 # Each entry is an inclusive [start, end] offset in seconds from t=0.
