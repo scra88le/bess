@@ -2,13 +2,14 @@
 
 Each subfolder is a self-contained scenario: a `config.yaml` (physical
 parameters) plus a `dispatch.csv` (1 s-resolution setpoints) designed to
-exercise one behaviour of the model. Run any of them with:
+exercise one behaviour of the model. Run any of them by name:
 
 ```bash
-.venv/bin/python main.py \
-  --config scenarios/<name>/config.yaml \
-  --dispatch scenarios/<name>/dispatch.csv
+.venv/bin/python main.py --scenario <name>
 ```
+
+(equivalently, point `--config scenarios/<name>/config.yaml` and
+`--dispatch scenarios/<name>/dispatch.csv` at the files directly).
 
 Add `--visualize` for the live dashboard, or redirect the streams to inspect
 them separately — telemetry goes to **stdout**, `[VIOLATION]` alarms to

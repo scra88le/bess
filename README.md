@@ -55,14 +55,25 @@ The entry point is `main.py`, a [`click`](https://click.palletsprojects.com/)
 CLI:
 
 ```bash
-.venv/bin/python main.py [--config PATH] [--dispatch PATH] [--visualize]
+.venv/bin/python main.py [--scenario NAME | --config PATH --dispatch PATH] [--visualize]
 ```
 
 | Flag | Default | Description |
 |------|---------|-------------|
+| `--scenario` | *(none)* | Run a named scenario from `scenarios/<name>/` (its `config.yaml` + `dispatch.csv`). Mutually exclusive with `--config`/`--dispatch`. |
 | `--config` | `config.yaml` | Physical parameters (validated at startup). |
 | `--dispatch` | `dispatch.csv` | Time-series dispatch signal at 1 s resolution. |
 | `--visualize` | *(off)* | Open a live matplotlib dashboard instead of printing CSV. |
+
+The quickest way to run one of the bundled cases is `--scenario`, which
+resolves both files for you:
+
+```bash
+.venv/bin/python main.py --scenario 08_thermal_trip
+.venv/bin/python main.py --scenario 08_thermal_trip --visualize
+```
+
+An unknown name prints the list of available scenarios.
 
 **Telemetry is written to stdout; violation alarms to stderr.** Redirect them
 independently:
@@ -241,13 +252,13 @@ first three; the `Battery` handles the rest):
 
 The `scenarios/` directory contains nine ready-to-run cases, each a
 self-contained `config.yaml` + `dispatch.csv` pair that isolates one behaviour.
-Run any of them with:
+Run any of them by name with `--scenario`:
 
 ```bash
-.venv/bin/python main.py \
-  --config scenarios/<name>/config.yaml \
-  --dispatch scenarios/<name>/dispatch.csv          # add --visualize for the dashboard
+.venv/bin/python main.py --scenario <name>          # add --visualize for the dashboard
 ```
+
+(or point `--config`/`--dispatch` at the files directly).
 
 | # | Scenario | What it demonstrates |
 |---|----------|----------------------|
