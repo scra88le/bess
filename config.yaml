@@ -10,7 +10,7 @@ ramping_limit_mw_per_sec: 2.0
 thermal:
   initial_temp_c: 25.0
   ambient_temp_c: 20.0
-  thermal_mass: 15000          # J/C equivalent
+  thermal_mass: 300000000.0    # J/C equivalent (~300 t of cells @ ~1000 J/kg/C)
   hvac_cooling_rate_c_per_sec: 0.05
   optimal_temp_c: 20.0         # HVAC target; aux load scales with deviation above this
   max_cell_temp_c: 60.0        # hard thermal cutoff (trip to 0 MW at/above this)
