@@ -1,0 +1,41 @@
+# Adverse-thermal scenario: hot ambient + reduced effective cooling.
+#
+# The default config.yaml can never trip thermally — its large thermal mass and
+# HVAC cooling rate out-pace any dispatch-driven I^2R heating. This scenario
+# models a hot day with a small/poorly-cooled thermal envelope so sustained
+# high-power discharge drives the cells past the 60 C cutoff.
+
+nominal_capacity_mwh: 50.0
+initial_soc: 0.50
+efficiency: 0.92
+ramping_limit_mw_per_sec: 2.0
+
+thermal:
+  initial_temp_c: 40.0         # already warm at start of the event
+  ambient_temp_c: 35.0         # hot day
+  thermal_mass: 30000000.0     # 3.0e7 J/C — small/poorly-cooled envelope
+  hvac_cooling_rate_c_per_sec: 0.05
+  optimal_temp_c: 35.0         # HVAC can only pull back toward ambient
+  max_cell_temp_c: 60.0        # hard thermal cutoff
+
+soc_non_linearity:
+  lower_threshold: 0.10
+  upper_threshold: 0.90
+  exponential_factor: 2.5
+
+auxiliary_load_kw:
+  base: 50.0
+  hvac_per_degree: 10.0
+
+grid_constraints:
+  max_export_mw: 45.0
+  max_import_mw: 45.0
+
+warranty:
+  max_equivalent_full_cycles: 3000
+
+degradation:
+  cycle_loss_per_efc: 0.0000667
+  calendar_loss_per_year: 0.02
+
+planned_outages: []
