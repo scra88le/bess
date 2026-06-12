@@ -1,17 +1,29 @@
 """Time-series step loop, constraint enforcement & logging.
 
 The DispatchEngine orchestrates time and applies external-system overrides
-(planned outages, grid constraints) around the Battery's physical model.
+around the Battery's physical model. It does not perform any physics itself;
+it clamps the injected dispatch setpoint through a sequence of constraints and
+hands the result to ``Battery.step``.
+
+Constraint order (per the spec):
+    pre-step   : planned outage masking, then hard grid export/import clips
+    intra-step : power ramping, then the battery's own SoC/thermal limits
+
+Any divergence between the injected dispatch signal and what was actually
+enforced is logged as a standard alarm block to stderr.
 """
 
 from __future__ import annotations
 
 import sys
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from .battery import Battery
 from .config_loader import Config
 from .telemetry import Telemetry
+
+DT_SECONDS: float = 1.0
+EPS: float = 1e-9
 
 
 class DispatchEngine:
@@ -23,17 +35,84 @@ class DispatchEngine:
         self.battery = battery
         self.telemetry = telemetry or Telemetry()
 
-    def run(self, dispatch_mw: List[float]) -> Telemetry:
-        """Execute the full dispatch series, one second per sample."""
-        raise NotImplementedError
+        gc = config.grid_constraints
+        self._max_export_mw = float(gc["max_export_mw"])
+        self._max_import_mw = float(gc["max_import_mw"])
+        self._ramp_mw = float(config.ramping_limit_mw_per_sec)
+        # Previous *actual* delivered power; ramping is measured against it.
+        self._prev_power_mw = 0.0
 
+    # ------------------------------------------------------------------ #
+    # Main loop
+    # ------------------------------------------------------------------ #
+    def run(self, dispatch_mw: List[float], dt: float = DT_SECONDS) -> Telemetry:
+        """Execute the full dispatch series, one ``dt`` per sample."""
+        for t, injected in enumerate(dispatch_mw):
+            self._step(t, float(injected), dt)
+        return self.telemetry
+
+    def _step(self, t: int, injected_mw: float, dt: float) -> Dict[str, float]:
+        """Clamp one setpoint through every constraint and advance the battery."""
+        setpoint = injected_mw
+
+        # --- Pre-step: planned outage, then grid constraints ----------- #
+        setpoint = self._pre_step_clamp(t, setpoint)
+
+        # --- Intra-step: ramping against the previous actual power ------ #
+        ramped = self._apply_ramp(setpoint, dt)
+        if abs(ramped - setpoint) > EPS:
+            self._log_violation(t, setpoint, ramped, "Ramp Limit Exceeded")
+        setpoint = ramped
+
+        # --- Intra-step: battery physics (SoC non-linearity, thermal) -- #
+        result = self.battery.step(setpoint, dt)
+        actual = result["actual_mw"]
+        if result["limit_reason"] and abs(actual - setpoint) > EPS:
+            self._log_violation(t, setpoint, actual, result["limit_reason"])
+
+        self._prev_power_mw = actual
+
+        row: Dict[str, float] = {
+            "timestamp_s": float(t),
+            "injected_mw": injected_mw,
+            "grid_limit_export_mw": self._max_export_mw,
+            "grid_limit_import_mw": -self._max_import_mw,
+            **result,
+        }
+        self.telemetry.record(row)
+        return row
+
+    # ------------------------------------------------------------------ #
+    # Constraint helpers
+    # ------------------------------------------------------------------ #
     def _pre_step_clamp(self, t: int, target_mw: float) -> float:
         """Apply planned-outage masking and hard grid export/import clips."""
-        raise NotImplementedError
+        setpoint = target_mw
+
+        if self._is_outage(t):
+            if abs(setpoint) > EPS:
+                self._log_violation(t, setpoint, 0.0, "Planned Outage")
+            return 0.0
+
+        clipped = min(self._max_export_mw, max(-self._max_import_mw, setpoint))
+        if abs(clipped - setpoint) > EPS:
+            self._log_violation(t, setpoint, clipped, "Grid Constrained")
+        return clipped
+
+    def _apply_ramp(self, target_mw: float, dt: float) -> float:
+        """Restrict the step change in power to the configured MW/s limit."""
+        max_delta = self._ramp_mw * dt
+        upper = self._prev_power_mw + max_delta
+        lower = self._prev_power_mw - max_delta
+        return min(upper, max(lower, target_mw))
 
     def _is_outage(self, t: int) -> bool:
         """True if timestep t falls within a planned maintenance window."""
-        raise NotImplementedError
+        for window in self.config.planned_outages:
+            start, end = window
+            if start <= t <= end:
+                return True
+        return False
 
     @staticmethod
     def _log_violation(t: int, desired: float, enforced: float, reason: str) -> None:
