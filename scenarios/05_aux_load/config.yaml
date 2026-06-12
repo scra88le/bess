@@ -1,0 +1,29 @@
+# Scenario: 05_aux_load
+# Idle (0 MW) dispatch with a hot start and heavy aux load; SoC bleeds down and aux decays as the cell cools to optimal.
+nominal_capacity_mwh: 50.0
+initial_soc: 0.5
+efficiency: 0.92
+ramping_limit_mw_per_sec: 2.0
+thermal:
+  initial_temp_c: 45.0
+  ambient_temp_c: 20.0
+  thermal_mass: 300000000.0
+  hvac_cooling_rate_c_per_sec: 0.05
+  optimal_temp_c: 20.0
+  max_cell_temp_c: 60.0
+soc_non_linearity:
+  lower_threshold: 0.1
+  upper_threshold: 0.9
+  exponential_factor: 2.5
+auxiliary_load_kw:
+  base: 2000.0
+  hvac_per_degree: 200.0
+grid_constraints:
+  max_export_mw: 45.0
+  max_import_mw: 45.0
+warranty:
+  max_equivalent_full_cycles: 3000
+degradation:
+  cycle_loss_per_efc: 6.67e-05
+  calendar_loss_per_year: 0.02
+planned_outages: []
