@@ -1,0 +1,34 @@
+# Grid-Scale BESS physical model configuration.
+# All physical constants are strictly defined here. Invalid or physically
+# impossible values must raise a runtime configuration exception at startup.
+
+nominal_capacity_mwh: 50.0
+initial_soc: 0.50
+efficiency: 0.92
+ramping_limit_mw_per_sec: 2.0
+
+thermal:
+  initial_temp_c: 25.0
+  ambient_temp_c: 20.0
+  thermal_mass: 15000          # J/C equivalent
+  hvac_cooling_rate_c_per_sec: 0.05
+
+soc_non_linearity:
+  lower_threshold: 0.10
+  upper_threshold: 0.90
+  exponential_factor: 2.5
+
+auxiliary_load_kw:
+  base: 50.0
+  hvac_per_degree: 10.0
+
+grid_constraints:
+  max_export_mw: 45.0
+  max_import_mw: 45.0
+
+warranty:
+  max_equivalent_full_cycles: 3000
+
+# Optional: planned maintenance windows that mask dispatch to 0 MW.
+# Each entry is an inclusive [start, end] offset in seconds from t=0.
+planned_outages: []
