@@ -5,7 +5,7 @@ parameters) plus a `dispatch.csv` (1 s-resolution setpoints) designed to
 exercise one behaviour of the model. Run any of them by name:
 
 ```bash
-.venv/bin/python main.py --scenario <name>
+.venv/bin/python main.py simulate --scenario <name>
 ```
 
 (equivalently, point `--config scenarios/<name>/config.yaml` and
@@ -16,7 +16,8 @@ them separately — telemetry goes to **stdout**, `[VIOLATION]` alarms to
 **stderr**:
 
 ```bash
-... --config scenarios/<name>/config.yaml --dispatch scenarios/<name>/dispatch.csv \
+.venv/bin/python main.py simulate \
+    --config scenarios/<name>/config.yaml --dispatch scenarios/<name>/dispatch.csv \
     > telemetry.csv 2> violations.log
 ```
 

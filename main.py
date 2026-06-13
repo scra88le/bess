@@ -8,9 +8,13 @@ from typing import List, Optional, Tuple
 
 import click
 
+from src import optimiser as opt
 from src.battery import Battery
 from src.config_loader import load_config
 from src.dispatch_engine import DispatchEngine
+from src.optimiser import OptimiseOptions
+from src.prices.generator import generate as generate_prices
+from src.runtime import RunnerConfig, run as run_service
 from src.telemetry import Telemetry
 
 SCENARIOS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scenarios")
@@ -67,7 +71,12 @@ def _resolve_inputs(scenario: Optional[str], config_path: Optional[str],
     return cfg, disp
 
 
-@click.command()
+@click.group()
+def cli() -> None:
+    """Grid-scale BESS: simulate, optimise day-ahead dispatch, or run the service."""
+
+
+@cli.command()
 @click.option("--scenario", default=None,
               help="Run a named scenario from scenarios/<name>/ (its config.yaml "
                    "+ dispatch.csv). Mutually exclusive with --config/--dispatch.")
@@ -79,9 +88,9 @@ def _resolve_inputs(scenario: Optional[str], config_path: Optional[str],
                    f"(default: {DEFAULT_DISPATCH}).")
 @click.option("--visualize", is_flag=True,
               help="Open a live matplotlib dashboard during the run.")
-def main(scenario: Optional[str], config_path: Optional[str],
-         dispatch_path: Optional[str], visualize: bool) -> None:
-    """Run the BESS simulation over a dispatch signal."""
+def simulate(scenario: Optional[str], config_path: Optional[str],
+             dispatch_path: Optional[str], visualize: bool) -> None:
+    """Run the high-fidelity simulation over a dispatch signal."""
     config_path, dispatch_path = _resolve_inputs(scenario, config_path, dispatch_path)
 
     config = load_config(config_path)
@@ -99,5 +108,67 @@ def main(scenario: Optional[str], config_path: Optional[str],
         telemetry.emit_stdout()
 
 
+@cli.command(name="generate-prices")
+@click.option("--root", required=True, help="Data root (fsspec URL: ./data or s3://…).")
+@click.option("--start", required=True, help="First day, YYYY-MM-DD.")
+@click.option("--days", type=int, required=True, help="Number of daily forecasts to write.")
+@click.option("--resolution-minutes", type=int, default=30, show_default=True,
+              help="Market period length (must divide 1440).")
+@click.option("--seed", type=int, default=0, show_default=True,
+              help="Seed for the synthetic price model (reproducible per date).")
+def generate_prices_cmd(root: str, start: str, days: int,
+                        resolution_minutes: int, seed: int) -> None:
+    """Generate N days of synthetic day-ahead price forecasts in advance."""
+    paths = generate_prices(root, start, days, resolution_minutes=resolution_minutes,
+                            seed=seed)
+    click.echo(f"Wrote {len(paths)} forecast(s) under {root}/prices/")
+
+
+@cli.command()
+@click.option("--root", required=True, help="Data root (fsspec URL).")
+@click.option("--config", "config_path", default=None,
+              help=f"Physical parameters file (default: {DEFAULT_CONFIG}).")
+@click.option("--date", required=True, help="Day to optimise, YYYY-MM-DD.")
+@click.option("--terminal-soc", type=float, default=None,
+              help="End-of-day SoC target (default: initial_soc).")
+@click.option("--degradation-cost", type=float, default=0.0, show_default=True,
+              help="£/MWh throughput penalty discouraging over-cycling.")
+def optimise(root: str, config_path: Optional[str], date: str,
+             terminal_soc: Optional[float], degradation_cost: float) -> None:
+    """Solve the day-ahead LP for a date and write its dispatch schedule."""
+    config = load_config(config_path or DEFAULT_CONFIG)
+    prices, resolution = _read_prices(root, date)
+    options = OptimiseOptions(terminal_soc=terminal_soc, degradation_cost=degradation_cost)
+    schedule = opt.optimise(config, prices, resolution, options, date=date)
+    path = schedule.write(root)
+    click.echo(f"Optimised {date}: objective={schedule.objective_value:.2f}  ->  {path}")
+
+
+@cli.command()
+@click.option("--root", required=True, help="Data root (fsspec URL).")
+@click.option("--config", "config_path", default=None,
+              help=f"Physical parameters file (default: {DEFAULT_CONFIG}).")
+@click.option("--start", required=True, help="Start datetime/date, e.g. 2026-06-13.")
+@click.option("--days", type=int, default=None,
+              help="Number of sim-days to run (default: run indefinitely).")
+@click.option("--time-scale", type=float, default=1.0, show_default=True,
+              help="Sim-seconds per wall-second (1 = real time, large = demo).")
+def run(root: str, config_path: Optional[str], start: str,
+        days: Optional[int], time_scale: float) -> None:
+    """Run the long-running simulator, following daily schedules."""
+    config = load_config(config_path or DEFAULT_CONFIG)
+    runner_config = RunnerConfig(root=root, time_scale=time_scale, days=days)
+    summary = run_service(config, runner_config, start)
+    click.echo(f"Ran {summary['days_run']} day(s), wrote "
+               f"{summary['minutes_written']} minute record(s); "
+               f"final SoC={summary['final_soc']:.3f}")
+
+
+def _read_prices(root: str, date: str):
+    """Read a day's price forecast (prices, resolution_minutes)."""
+    from src.optimiser import prices as prices_module
+    return prices_module.read(root, date)
+
+
 if __name__ == "__main__":
-    main()
+    cli()
