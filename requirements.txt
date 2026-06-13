@@ -1,4 +1,13 @@
+# Core simulator
 numpy
 matplotlib
 pyyaml
 click
+
+# Day-ahead optimiser + runner (Phase 0/1)
+pulp          # LP solver (bundled CBC) for day-ahead optimisation
+fsspec        # storage abstraction: local dir today, s3:// later (one URL change)
+pyarrow       # Parquet I/O for the data layout (JSONL fallback if unavailable)
+
+# Optional, only needed to actually read/write s3:// roots:
+# s3fs

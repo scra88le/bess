@@ -24,6 +24,7 @@ what was commanded.
   - [Violation alarms (stderr)](#violation-alarms-stderr)
 - [What the model simulates](#what-the-model-simulates)
 - [Example scenarios](#example-scenarios)
+- [Day-ahead optimisation & the runner service](#day-ahead-optimisation--the-runner-service)
 - [Project layout](#project-layout)
 - [Development](#development)
 
@@ -40,7 +41,7 @@ source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt    # numpy, matplotlib, pyyaml, click
 
 # 3. Run with the default config and a 24-hour sine dispatch
-python main.py --config config.yaml --dispatch dispatch_sine.csv
+python main.py simulate --config config.yaml --dispatch dispatch_sine.csv
 ```
 
 > The repo already contains a `.venv/` with the dependencies installed, so you
@@ -52,10 +53,23 @@ python main.py --config config.yaml --dispatch dispatch_sine.csv
 ## Running the runtime
 
 The entry point is `main.py`, a [`click`](https://click.palletsprojects.com/)
-CLI:
+CLI with four subcommands:
 
 ```bash
-.venv/bin/python main.py [--scenario NAME | --config PATH --dispatch PATH] [--visualize]
+.venv/bin/python main.py <command> [options]
+```
+
+| Command | Purpose |
+|---------|---------|
+| `simulate` | Run the high-fidelity physics over a dispatch signal (the original runtime). |
+| `generate-prices` | Batch-generate N days of synthetic day-ahead price forecasts. |
+| `optimise` | Solve the day-ahead LP for a date → optimal dispatch schedule. |
+| `run` | Long-running service: follow daily schedules, emit minute telemetry. |
+
+`simulate` takes the same options as before:
+
+```bash
+.venv/bin/python main.py simulate [--scenario NAME | --config PATH --dispatch PATH] [--visualize]
 ```
 
 | Flag | Default | Description |
@@ -65,13 +79,17 @@ CLI:
 | `--dispatch` | `dispatch.csv` | Time-series dispatch signal at 1 s resolution. |
 | `--visualize` | *(off)* | Open a live matplotlib dashboard instead of printing CSV. |
 
-The quickest way to run one of the bundled cases is `--scenario`, which
+The quickest way to run one of the bundled cases is `simulate --scenario`, which
 resolves both files for you:
 
 ```bash
-.venv/bin/python main.py --scenario 08_thermal_trip
-.venv/bin/python main.py --scenario 08_thermal_trip --visualize
+.venv/bin/python main.py simulate --scenario 08_thermal_trip
+.venv/bin/python main.py simulate --scenario 08_thermal_trip --visualize
 ```
+
+> **Note:** simulation runs are now under the `simulate` subcommand
+> (`python main.py simulate …`), not bare `python main.py …`. The day-ahead
+> optimiser and runner are documented [below](#day-ahead-optimisation--the-runner-service).
 
 An unknown name prints the list of available scenarios.
 
@@ -80,11 +98,11 @@ independently:
 
 ```bash
 # Save telemetry and alarms separately
-.venv/bin/python main.py --config config.yaml --dispatch dispatch_sine.csv \
+.venv/bin/python main.py simulate --config config.yaml --dispatch dispatch_sine.csv \
     > telemetry.csv 2> violations.log
 
 # Only watch the constraint violations
-.venv/bin/python main.py --config config.yaml --dispatch dispatch_sine.csv \
+.venv/bin/python main.py simulate --config config.yaml --dispatch dispatch_sine.csv \
     2>&1 >/dev/null
 ```
 
@@ -96,7 +114,7 @@ With `--visualize` the runtime opens a four-panel dashboard of the recorded run:
 4. **Degradation** — capacity loss % with equivalent full cycles on a twin axis
 
 ```bash
-.venv/bin/python main.py --config config.yaml --dispatch dispatch_sine.csv --visualize
+.venv/bin/python main.py simulate --config config.yaml --dispatch dispatch_sine.csv --visualize
 ```
 
 ---
@@ -252,10 +270,10 @@ first three; the `Battery` handles the rest):
 
 The `scenarios/` directory contains nine ready-to-run cases, each a
 self-contained `config.yaml` + `dispatch.csv` pair that isolates one behaviour.
-Run any of them by name with `--scenario`:
+Run any of them by name with `simulate --scenario`:
 
 ```bash
-.venv/bin/python main.py --scenario <name>          # add --visualize for the dashboard
+.venv/bin/python main.py simulate --scenario <name>     # add --visualize for the dashboard
 ```
 
 (or point `--config`/`--dispatch` at the files directly).
@@ -303,6 +321,75 @@ There are also two larger standalone dispatch files at the repo root:
 
 ---
 
+## Day-ahead optimisation & the runner service
+
+A second capability plans **optimal** dispatch from a day-ahead price forecast,
+then runs the simulator against that plan as a long-running service emitting
+telemetry every (simulated) minute and re-planning each day.
+
+### The two-tier design
+
+The physics model is nonlinear and can't be optimised directly, so a **reduced
+LP plans, the full simulator realises**:
+
+- **Optimiser** (`src/optimiser/`) — a convex LP (PuLP/CBC) that maximises
+  arbitrage revenue minus an optional degradation cost, subject to energy
+  balance, per-direction efficiency, power limits, and a SoC band set to the
+  non-linearity thresholds (so the plan stays in the regime the simulator can
+  realise). Returns a per-period dispatch schedule.
+- **Runner** (`src/runtime/`) — drives the existing engine second-by-second
+  against the schedule, paced by a configurable **time-scale**, aggregating to
+  1-minute telemetry records.
+
+Both read the same `config.yaml`, the single source of truth for physical
+parameters. Components coordinate only through a date-partitioned file layout
+(`src/io_layout.py`), so the storage backend is just an fsspec URL — `./data`
+locally today, `s3://bucket/prefix` later with no code change.
+
+### File layout (the integration contract)
+
+```
+<root>/prices/    date=YYYY-MM-DD/ forecast.parquet
+<root>/schedules/ date=YYYY-MM-DD/ dispatch.parquet
+<root>/telemetry/ date=YYYY-MM-DD/ part-<minute>.parquet
+<root>/state/     battery_state.json          # checkpoint for restart
+```
+
+### End-to-end workflow
+
+```bash
+ROOT=./data
+
+# 1. Generate price forecasts in advance (batch, N days).
+.venv/bin/python main.py generate-prices --root $ROOT --start 2026-06-13 --days 2 --seed 7
+
+# 2. Optimise each day's dispatch from its forecast.
+.venv/bin/python main.py optimise --root $ROOT --config config.yaml --date 2026-06-13
+.venv/bin/python main.py optimise --root $ROOT --config config.yaml --date 2026-06-14
+
+# 3. Run the simulator following the schedules. time-scale 86400 ≈ 1 day/second
+#    (demo); use 1 for real time.
+.venv/bin/python main.py run --root $ROOT --config config.yaml \
+    --start 2026-06-13 --days 2 --time-scale 86400
+```
+
+This writes per-minute telemetry under `$ROOT/telemetry/`, re-loading each day's
+schedule at the day boundary. A missing schedule **raises** rather than silently
+coasting. The run checkpoints state every minute, so it resumes cleanly after a
+restart.
+
+| Subcommand option | Notes |
+|-------------------|-------|
+| `generate-prices --start --days [--resolution-minutes] [--seed]` | Synthetic, pluggable price model; resolution must divide 1440. |
+| `optimise --date [--terminal-soc] [--degradation-cost]` | LP per day; defaults to returning to the initial SoC, pure arbitrage. |
+| `run --start [--days] --time-scale` | `time-scale` = sim-seconds per wall-second (1 = real time). |
+
+> The price model is synthetic but behind a pluggable interface
+> (`src/prices/model.py`), so a real market feed can drop in without touching the
+> optimiser or runner.
+
+---
+
 ## Project layout
 
 ```text
@@ -318,7 +405,11 @@ There are also two larger standalone dispatch files at the repo root:
 │   ├── battery.py          # physical state machine & core math
 │   ├── config_loader.py    # YAML loading + strict validation
 │   ├── dispatch_engine.py  # time loop, constraint enforcement, alarm logging
-│   └── telemetry.py        # CSV emission + matplotlib dashboard
+│   ├── telemetry.py        # CSV emission + matplotlib dashboard
+│   ├── io_layout.py        # date-partitioned file contract + fsspec I/O seam
+│   ├── prices/             # synthetic (pluggable) price model + batch generator
+│   ├── optimiser/          # day-ahead LP (prices, model, schedule)
+│   └── runtime/            # runner service (clock, aggregator, sink, state, runner)
 ├── scenarios/              # 9 self-contained example scenarios (+ README)
 ├── scripts/
 │   └── make_scenarios.py   # scenario generator / verifier

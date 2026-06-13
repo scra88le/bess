@@ -40,16 +40,35 @@ class DispatchEngine:
         self._max_import_mw = float(gc["max_import_mw"])
         self._ramp_mw = float(config.ramping_limit_mw_per_sec)
         # Previous *actual* delivered power; ramping is measured against it.
+        # Persists across days/steps because physical ramp state is real.
         self._prev_power_mw = 0.0
+        # Monotonic global step index (telemetry timestamp) and a within-day
+        # second counter used only for planned-outage lookups.
+        self._t = 0
+        self._day_t = 0
 
     # ------------------------------------------------------------------ #
     # Main loop
     # ------------------------------------------------------------------ #
     def run(self, dispatch_mw: List[float], dt: float = DT_SECONDS) -> Telemetry:
         """Execute the full dispatch series, one ``dt`` per sample."""
-        for t, injected in enumerate(dispatch_mw):
-            self._step(t, float(injected), dt)
+        for injected in dispatch_mw:
+            self.step(float(injected), dt)
         return self.telemetry
+
+    def step(self, injected_mw: float, dt: float = DT_SECONDS) -> Dict[str, float]:
+        """Advance one timestep externally (for the long-running runner).
+
+        Returns the telemetry row. ``run()`` is just a loop over this.
+        """
+        row = self._step(self._t, float(injected_mw), dt)
+        self._t += 1
+        self._day_t += 1
+        return row
+
+    def begin_day(self) -> None:
+        """Reset the within-day clock so outage windows recur each day."""
+        self._day_t = 0
 
     def _step(self, t: int, injected_mw: float, dt: float) -> Dict[str, float]:
         """Clamp one setpoint through every constraint and advance the battery."""
@@ -89,7 +108,7 @@ class DispatchEngine:
         """Apply planned-outage masking and hard grid export/import clips."""
         setpoint = target_mw
 
-        if self._is_outage(t):
+        if self._is_outage():
             if abs(setpoint) > EPS:
                 self._log_violation(t, setpoint, 0.0, "Planned Outage")
             return 0.0
@@ -106,11 +125,15 @@ class DispatchEngine:
         lower = self._prev_power_mw - max_delta
         return min(upper, max(lower, target_mw))
 
-    def _is_outage(self, t: int) -> bool:
-        """True if timestep t falls within a planned maintenance window."""
+    def _is_outage(self) -> bool:
+        """True if the current within-day second is in a maintenance window.
+
+        Windows are interpreted as seconds-since-midnight, so they recur each
+        simulated day (``_day_t`` is reset by ``begin_day``).
+        """
         for window in self.config.planned_outages:
             start, end = window
-            if start <= t <= end:
+            if start <= self._day_t <= end:
                 return True
         return False
 
