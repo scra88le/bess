@@ -410,6 +410,15 @@ forecast/schedule horizon, and operate). The only difference from local runs is
 `--root s3://…` instead of `--root ./data`; a custom S3 endpoint (e.g. MinIO) is
 selected with the `BESS_S3_ENDPOINT_URL` environment variable.
 
+### Trader dashboard (Databricks)
+
+[`databricks/`](databricks/README.md) surfaces the S3 data as a **Lakeview
+dashboard for a BESS trader** — KPIs (SoC, P&L, EFC, capacity loss), the
+price-forecast-vs-optimised-dispatch arbitrage view, SoC/power/temperature over
+the day, and constraint violations. An Auto Loader notebook ingests the S3 layout
+into Unity Catalog Delta tables and builds the trader-shaped gold views the
+dashboard reads.
+
 ---
 
 ## Project layout
@@ -438,6 +447,7 @@ selected with the `BESS_S3_ENDPOINT_URL` environment variable.
 ├── Dockerfile              # single image for all subcommands
 ├── docker-compose.yml      # local AWS-topology mirror (MinIO = S3)
 ├── deploy/                 # Terraform AWS stack + deployment runbook
+├── databricks/             # Auto Loader ingestion notebook + Lakeview trader dashboard
 └── tests/                  # pytest suite
 ```
 
