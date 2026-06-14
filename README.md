@@ -390,6 +390,28 @@ restart.
 
 ---
 
+## Containerised & cloud deployment
+
+The runtime ships as a single Docker image (all subcommands) plus a Terraform
+stack that runs the three components on AWS — the `run` service always-on under
+**ECS/Fargate**, and `optimise` / `generate-prices` as **EventBridge-scheduled**
+ECS tasks, all coordinated through an **S3** data root.
+
+**Try the whole topology locally first** (no AWS account — MinIO stands in for S3):
+
+```bash
+docker compose up --build        # seeds prices, optimises, streams telemetry to MinIO
+# MinIO console: http://localhost:9001  (minioadmin / minioadmin)
+```
+
+To deploy to AWS, see **[`deploy/README.md`](deploy/README.md)** for the full
+runbook (build & push the image, `terraform apply`, bootstrap the initial
+forecast/schedule horizon, and operate). The only difference from local runs is
+`--root s3://…` instead of `--root ./data`; a custom S3 endpoint (e.g. MinIO) is
+selected with the `BESS_S3_ENDPOINT_URL` environment variable.
+
+---
+
 ## Project layout
 
 ```text
@@ -413,6 +435,9 @@ restart.
 ├── scenarios/              # 9 self-contained example scenarios (+ README)
 ├── scripts/
 │   └── make_scenarios.py   # scenario generator / verifier
+├── Dockerfile              # single image for all subcommands
+├── docker-compose.yml      # local AWS-topology mirror (MinIO = S3)
+├── deploy/                 # Terraform AWS stack + deployment runbook
 └── tests/                  # pytest suite
 ```
 

@@ -1,0 +1,11 @@
+# Local Terraform/OpenTofu working artifacts
+.terraform/
+# Lock file holds tool-specific (tofu vs terraform) registry hashes; let init regenerate.
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+*.tfvars
+*.tfvars.json
+!example.tfvars

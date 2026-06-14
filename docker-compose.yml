@@ -1,0 +1,78 @@
+# Local mirror of the AWS topology: MinIO stands in for S3, and the same image
+# runs the three components (generate-prices -> optimise -> run) against an
+# s3:// root — exactly as they will on ECS/Fargate. Proves the containerised
+# pipeline end-to-end without any AWS account.
+#
+#   docker compose up --build        # seed prices, optimise, then stream telemetry
+#   MinIO console: http://localhost:9001  (minioadmin / minioadmin)
+#
+# Override the demo window:
+#   BESS_START=2026-07-01 BESS_TIME_SCALE=1440 docker compose up --build
+
+x-s3-env: &s3-env
+  AWS_ACCESS_KEY_ID: minioadmin
+  AWS_SECRET_ACCESS_KEY: minioadmin
+  AWS_DEFAULT_REGION: us-east-1
+  BESS_S3_ENDPOINT_URL: http://minio:9000
+
+services:
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"     # S3 API
+      - "9001:9001"     # web console
+    volumes:
+      - minio-data:/data
+
+  # Wait for MinIO to accept connections, then create the bucket.
+  createbucket:
+    image: minio/mc
+    depends_on:
+      minio:
+        condition: service_started
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 minioadmin minioadmin; do
+        echo 'waiting for minio...'; sleep 1;
+      done;
+      mc mb --ignore-existing local/bess;
+      echo 'bucket s3://bess ready';
+      "
+
+  # One-shot: seed N days of price forecasts.
+  generate:
+    build: .
+    depends_on:
+      createbucket:
+        condition: service_completed_successfully
+    environment: *s3-env
+    command: ["generate-prices", "--root", "s3://bess",
+              "--start", "${BESS_START:-2026-06-14}", "--days", "3", "--seed", "7"]
+
+  # One-shot: optimise each seeded day.
+  optimise:
+    build: .
+    depends_on:
+      generate:
+        condition: service_completed_successfully
+    environment: *s3-env
+    command: ["optimise", "--root", "s3://bess", "--config", "config.yaml",
+              "--date", "${BESS_START:-2026-06-14}", "--days", "3"]
+
+  # Long-running: follow the schedules, emit minute telemetry to s3://bess/telemetry/.
+  run:
+    build: .
+    depends_on:
+      optimise:
+        condition: service_completed_successfully
+    environment: *s3-env
+    command: ["run", "--root", "s3://bess", "--config", "config.yaml",
+              "--start", "${BESS_START:-2026-06-14}", "--days", "3",
+              "--time-scale", "${BESS_TIME_SCALE:-1440}"]
+
+volumes:
+  minio-data:

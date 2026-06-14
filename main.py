@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import datetime as dt
 import os
 from typing import List, Optional, Tuple
 
@@ -110,53 +111,67 @@ def simulate(scenario: Optional[str], config_path: Optional[str],
 
 @cli.command(name="generate-prices")
 @click.option("--root", required=True, help="Data root (fsspec URL: ./data or s3://…).")
-@click.option("--start", required=True, help="First day, YYYY-MM-DD.")
-@click.option("--days", type=int, required=True, help="Number of daily forecasts to write.")
+@click.option("--start", default=None,
+              help="First day, YYYY-MM-DD (default: today).")
+@click.option("--days", type=int, default=7, show_default=True,
+              help="Number of daily forecasts to write.")
 @click.option("--resolution-minutes", type=int, default=30, show_default=True,
               help="Market period length (must divide 1440).")
 @click.option("--seed", type=int, default=0, show_default=True,
               help="Seed for the synthetic price model (reproducible per date).")
-def generate_prices_cmd(root: str, start: str, days: int,
+def generate_prices_cmd(root: str, start: Optional[str], days: int,
                         resolution_minutes: int, seed: int) -> None:
     """Generate N days of synthetic day-ahead price forecasts in advance."""
+    start = start or dt.date.today().isoformat()
     paths = generate_prices(root, start, days, resolution_minutes=resolution_minutes,
                             seed=seed)
-    click.echo(f"Wrote {len(paths)} forecast(s) under {root}/prices/")
+    click.echo(f"Wrote {len(paths)} forecast(s) from {start} under {root}/prices/")
 
 
 @cli.command()
 @click.option("--root", required=True, help="Data root (fsspec URL).")
 @click.option("--config", "config_path", default=None,
               help=f"Physical parameters file (default: {DEFAULT_CONFIG}).")
-@click.option("--date", required=True, help="Day to optimise, YYYY-MM-DD.")
+@click.option("--date", default=None,
+              help="First day to optimise, YYYY-MM-DD (default: tomorrow).")
+@click.option("--days", type=int, default=1, show_default=True,
+              help="Number of consecutive days to optimise.")
 @click.option("--terminal-soc", type=float, default=None,
               help="End-of-day SoC target (default: initial_soc).")
 @click.option("--degradation-cost", type=float, default=0.0, show_default=True,
               help="£/MWh throughput penalty discouraging over-cycling.")
-def optimise(root: str, config_path: Optional[str], date: str,
+def optimise(root: str, config_path: Optional[str], date: Optional[str], days: int,
              terminal_soc: Optional[float], degradation_cost: float) -> None:
-    """Solve the day-ahead LP for a date and write its dispatch schedule."""
+    """Solve the day-ahead LP for one or more days and write dispatch schedules.
+
+    With no --date, plans tomorrow onward (so a daily job stays a day ahead).
+    """
     config = load_config(config_path or DEFAULT_CONFIG)
-    prices, resolution = _read_prices(root, date)
+    first = dt.date.fromisoformat(date) if date else dt.date.today() + dt.timedelta(days=1)
     options = OptimiseOptions(terminal_soc=terminal_soc, degradation_cost=degradation_cost)
-    schedule = opt.optimise(config, prices, resolution, options, date=date)
-    path = schedule.write(root)
-    click.echo(f"Optimised {date}: objective={schedule.objective_value:.2f}  ->  {path}")
+    for offset in range(days):
+        day = (first + dt.timedelta(days=offset)).isoformat()
+        prices, resolution = _read_prices(root, day)
+        schedule = opt.optimise(config, prices, resolution, options, date=day)
+        path = schedule.write(root)
+        click.echo(f"Optimised {day}: objective={schedule.objective_value:.2f}  ->  {path}")
 
 
 @cli.command()
 @click.option("--root", required=True, help="Data root (fsspec URL).")
 @click.option("--config", "config_path", default=None,
               help=f"Physical parameters file (default: {DEFAULT_CONFIG}).")
-@click.option("--start", required=True, help="Start datetime/date, e.g. 2026-06-13.")
+@click.option("--start", default=None,
+              help="Start datetime/date (default: today). Ignored if a checkpoint exists.")
 @click.option("--days", type=int, default=None,
               help="Number of sim-days to run (default: run indefinitely).")
 @click.option("--time-scale", type=float, default=1.0, show_default=True,
               help="Sim-seconds per wall-second (1 = real time, large = demo).")
-def run(root: str, config_path: Optional[str], start: str,
+def run(root: str, config_path: Optional[str], start: Optional[str],
         days: Optional[int], time_scale: float) -> None:
     """Run the long-running simulator, following daily schedules."""
     config = load_config(config_path or DEFAULT_CONFIG)
+    start = start or dt.date.today().isoformat()
     runner_config = RunnerConfig(root=root, time_scale=time_scale, days=days)
     summary = run_service(config, runner_config, start)
     click.echo(f"Ran {summary['days_run']} day(s), wrote "

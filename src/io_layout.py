@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import datetime as _dt
 import json
+import os
 from typing import Any, Dict, List, Optional, Union
 
 import fsspec
@@ -74,8 +75,19 @@ def state_path(root: str) -> str:
 # --------------------------------------------------------------------- #
 # I/O primitives (fsspec-backed, atomic)
 # --------------------------------------------------------------------- #
+def _storage_options(path: str) -> Dict[str, Any]:
+    """fsspec options. For s3://, honour a custom endpoint (MinIO / S3-compatible)
+    via BESS_S3_ENDPOINT_URL; AWS credentials come from the standard env/role chain.
+    """
+    if path.startswith("s3://"):
+        endpoint = os.environ.get("BESS_S3_ENDPOINT_URL")
+        if endpoint:
+            return {"client_kwargs": {"endpoint_url": endpoint}}
+    return {}
+
+
 def _fs_and_path(path: str):
-    return fsspec.core.url_to_fs(path)
+    return fsspec.core.url_to_fs(path, **_storage_options(path))
 
 
 def exists(path: str) -> bool:

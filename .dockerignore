@@ -1,0 +1,23 @@
+# Keep the build context (and image) small.
+.venv/
+.git/
+.gitignore
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+__pycache__/
+*.pyc
+.DS_Store
+
+# Tests, scenarios, docs, and local data are not needed at runtime.
+tests/
+scenarios/
+scripts/
+deploy/
+data/
+*.md
+
+# Example/local artifacts (config.yaml IS copied explicitly in the Dockerfile).
+dispatch*.csv
+config_hot.yaml
+docker-compose.yml
