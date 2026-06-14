@@ -1,0 +1,222 @@
+{
+  "datasets": [
+    {
+      "name": "ds_latest",
+      "displayName": "Current state (latest minute)",
+      "queryLines": ["SELECT * FROM main.bess.v_latest"]
+    },
+    {
+      "name": "ds_pnl_daily",
+      "displayName": "Daily P&L",
+      "queryLines": ["SELECT date, pnl_gbp, net_mwh FROM main.bess.v_pnl_daily"]
+    },
+    {
+      "name": "ds_price_dispatch",
+      "displayName": "Price vs dispatch",
+      "queryLines": ["SELECT date, period, hour, price_per_mwh, scheduled_power_mw FROM main.bess.v_price_dispatch"]
+    },
+    {
+      "name": "ds_telemetry",
+      "displayName": "Telemetry (per minute)",
+      "queryLines": ["SELECT date, ts, soc_pct, mean_power_mw, cell_temp_c_end FROM main.bess.v_telemetry"]
+    },
+    {
+      "name": "ds_violations",
+      "displayName": "Violations by day",
+      "queryLines": ["SELECT date, grid_constrained, ramp_limit, thermal_trip, soc_nonlinear, soc_limits, planned_outage, total FROM main.bess.v_violations_daily"]
+    }
+  ],
+  "pages": [
+    {
+      "name": "trader",
+      "displayName": "BESS Trader",
+      "layout": [
+        {
+          "widget": {
+            "name": "date_filter",
+            "queries": [
+              {"name": "f_tel", "query": {"datasetName": "ds_telemetry", "fields": [{"name": "date", "expression": "`date`"}], "disaggregated": false}},
+              {"name": "f_pd", "query": {"datasetName": "ds_price_dispatch", "fields": [{"name": "date", "expression": "`date`"}], "disaggregated": false}},
+              {"name": "f_pnl", "query": {"datasetName": "ds_pnl_daily", "fields": [{"name": "date", "expression": "`date`"}], "disaggregated": false}},
+              {"name": "f_viol", "query": {"datasetName": "ds_violations", "fields": [{"name": "date", "expression": "`date`"}], "disaggregated": false}}
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {"fieldName": "date", "displayName": "Trading day", "queryName": "f_tel"},
+                  {"fieldName": "date", "displayName": "Trading day", "queryName": "f_pd"},
+                  {"fieldName": "date", "displayName": "Trading day", "queryName": "f_pnl"},
+                  {"fieldName": "date", "displayName": "Trading day", "queryName": "f_viol"}
+                ]
+              }
+            }
+          },
+          "position": {"x": 0, "y": 0, "width": 2, "height": 1}
+        },
+        {
+          "widget": {
+            "name": "kpi_soc",
+            "queries": [{"name": "q", "query": {"datasetName": "ds_latest", "fields": [{"name": "soc_pct", "expression": "`soc_pct`"}], "disaggregated": true}}],
+            "spec": {"version": 2, "widgetType": "counter", "encodings": {"value": {"fieldName": "soc_pct", "displayName": "SoC %", "format": {"type": "number-decimal", "decimalPlaces": {"type": "exact", "places": 1}}}}}
+          },
+          "position": {"x": 0, "y": 1, "width": 1, "height": 3}
+        },
+        {
+          "widget": {
+            "name": "kpi_pnl",
+            "queries": [{"name": "q", "query": {"datasetName": "ds_pnl_daily", "fields": [{"name": "sum_pnl", "expression": "SUM(`pnl_gbp`)"}], "disaggregated": false}}],
+            "spec": {"version": 2, "widgetType": "counter", "encodings": {"value": {"fieldName": "sum_pnl", "displayName": "P&L (£, selected day)", "format": {"type": "number-currency", "currencyCode": "GBP", "decimalPlaces": {"type": "exact", "places": 0}}}}}
+          },
+          "position": {"x": 1, "y": 1, "width": 1, "height": 3}
+        },
+        {
+          "widget": {
+            "name": "kpi_efc",
+            "queries": [{"name": "q", "query": {"datasetName": "ds_latest", "fields": [{"name": "equivalent_full_cycles_end", "expression": "`equivalent_full_cycles_end`"}], "disaggregated": true}}],
+            "spec": {"version": 2, "widgetType": "counter", "encodings": {"value": {"fieldName": "equivalent_full_cycles_end", "displayName": "Equivalent full cycles", "format": {"type": "number-decimal", "decimalPlaces": {"type": "exact", "places": 2}}}}}
+          },
+          "position": {"x": 2, "y": 1, "width": 1, "height": 3}
+        },
+        {
+          "widget": {
+            "name": "kpi_caploss",
+            "queries": [{"name": "q", "query": {"datasetName": "ds_latest", "fields": [{"name": "capacity_loss_pct", "expression": "`capacity_loss_pct`"}], "disaggregated": true}}],
+            "spec": {"version": 2, "widgetType": "counter", "encodings": {"value": {"fieldName": "capacity_loss_pct", "displayName": "Capacity loss %", "format": {"type": "number-decimal", "decimalPlaces": {"type": "exact", "places": 3}}}}}
+          },
+          "position": {"x": 3, "y": 1, "width": 1, "height": 3}
+        },
+        {
+          "widget": {
+            "name": "kpi_temp",
+            "queries": [{"name": "q", "query": {"datasetName": "ds_latest", "fields": [{"name": "cell_temp_c_end", "expression": "`cell_temp_c_end`"}], "disaggregated": true}}],
+            "spec": {"version": 2, "widgetType": "counter", "encodings": {"value": {"fieldName": "cell_temp_c_end", "displayName": "Cell temp °C", "format": {"type": "number-decimal", "decimalPlaces": {"type": "exact", "places": 1}}}}}
+          },
+          "position": {"x": 4, "y": 1, "width": 1, "height": 3}
+        },
+        {
+          "widget": {
+            "name": "kpi_throughput",
+            "queries": [{"name": "q", "query": {"datasetName": "ds_latest", "fields": [{"name": "cumulative_throughput_mwh_end", "expression": "`cumulative_throughput_mwh_end`"}], "disaggregated": true}}],
+            "spec": {"version": 2, "widgetType": "counter", "encodings": {"value": {"fieldName": "cumulative_throughput_mwh_end", "displayName": "Throughput MWh", "format": {"type": "number-decimal", "decimalPlaces": {"type": "exact", "places": 1}}}}}
+          },
+          "position": {"x": 5, "y": 1, "width": 1, "height": 3}
+        },
+        {
+          "widget": {
+            "name": "chart_price",
+            "queries": [{"name": "q", "query": {"datasetName": "ds_price_dispatch", "fields": [{"name": "hour", "expression": "`hour`"}, {"name": "price_per_mwh", "expression": "`price_per_mwh`"}], "disaggregated": true}}],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {"fieldName": "hour", "scale": {"type": "quantitative"}, "displayName": "Hour of day"},
+                "y": {"fieldName": "price_per_mwh", "scale": {"type": "quantitative"}, "displayName": "£/MWh"}
+              },
+              "frame": {"title": "Day-ahead price forecast", "showTitle": true}
+            }
+          },
+          "position": {"x": 0, "y": 4, "width": 3, "height": 6}
+        },
+        {
+          "widget": {
+            "name": "chart_dispatch",
+            "queries": [{"name": "q", "query": {"datasetName": "ds_price_dispatch", "fields": [{"name": "hour", "expression": "`hour`"}, {"name": "scheduled_power_mw", "expression": "`scheduled_power_mw`"}], "disaggregated": true}}],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {"fieldName": "hour", "scale": {"type": "quantitative"}, "displayName": "Hour of day"},
+                "y": {"fieldName": "scheduled_power_mw", "scale": {"type": "quantitative"}, "displayName": "Dispatch MW (+ discharge)"}
+              },
+              "frame": {"title": "Optimised dispatch schedule", "showTitle": true}
+            }
+          },
+          "position": {"x": 3, "y": 4, "width": 3, "height": 6}
+        },
+        {
+          "widget": {
+            "name": "chart_soc",
+            "queries": [{"name": "q", "query": {"datasetName": "ds_telemetry", "fields": [{"name": "ts", "expression": "`ts`"}, {"name": "soc_pct", "expression": "`soc_pct`"}], "disaggregated": true}}],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {"fieldName": "ts", "scale": {"type": "temporal"}, "displayName": "Time"},
+                "y": {"fieldName": "soc_pct", "scale": {"type": "quantitative"}, "displayName": "SoC %"}
+              },
+              "frame": {"title": "State of charge", "showTitle": true}
+            }
+          },
+          "position": {"x": 0, "y": 10, "width": 3, "height": 6}
+        },
+        {
+          "widget": {
+            "name": "chart_power",
+            "queries": [{"name": "q", "query": {"datasetName": "ds_telemetry", "fields": [{"name": "ts", "expression": "`ts`"}, {"name": "mean_power_mw", "expression": "`mean_power_mw`"}], "disaggregated": true}}],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {"fieldName": "ts", "scale": {"type": "temporal"}, "displayName": "Time"},
+                "y": {"fieldName": "mean_power_mw", "scale": {"type": "quantitative"}, "displayName": "Power MW (+ discharge)"}
+              },
+              "frame": {"title": "Delivered power", "showTitle": true}
+            }
+          },
+          "position": {"x": 3, "y": 10, "width": 3, "height": 6}
+        },
+        {
+          "widget": {
+            "name": "chart_temp",
+            "queries": [{"name": "q", "query": {"datasetName": "ds_telemetry", "fields": [{"name": "ts", "expression": "`ts`"}, {"name": "cell_temp_c_end", "expression": "`cell_temp_c_end`"}], "disaggregated": true}}],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {"fieldName": "ts", "scale": {"type": "temporal"}, "displayName": "Time"},
+                "y": {"fieldName": "cell_temp_c_end", "scale": {"type": "quantitative"}, "displayName": "Cell temp °C"}
+              },
+              "frame": {"title": "Cell temperature", "showTitle": true}
+            }
+          },
+          "position": {"x": 0, "y": 16, "width": 3, "height": 6}
+        },
+        {
+          "widget": {
+            "name": "table_violations",
+            "queries": [{"name": "q", "query": {"datasetName": "ds_violations", "fields": [
+              {"name": "date", "expression": "`date`"},
+              {"name": "grid_constrained", "expression": "`grid_constrained`"},
+              {"name": "ramp_limit", "expression": "`ramp_limit`"},
+              {"name": "thermal_trip", "expression": "`thermal_trip`"},
+              {"name": "soc_nonlinear", "expression": "`soc_nonlinear`"},
+              {"name": "soc_limits", "expression": "`soc_limits`"},
+              {"name": "planned_outage", "expression": "`planned_outage`"},
+              {"name": "total", "expression": "`total`"}
+            ], "disaggregated": true}}],
+            "spec": {
+              "version": 1,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {"fieldName": "date", "displayName": "Date"},
+                  {"fieldName": "grid_constrained", "displayName": "Grid"},
+                  {"fieldName": "ramp_limit", "displayName": "Ramp"},
+                  {"fieldName": "thermal_trip", "displayName": "Thermal"},
+                  {"fieldName": "soc_nonlinear", "displayName": "SoC non-lin"},
+                  {"fieldName": "soc_limits", "displayName": "SoC limits"},
+                  {"fieldName": "planned_outage", "displayName": "Outage"},
+                  {"fieldName": "total", "displayName": "Total"}
+                ]
+              },
+              "frame": {"title": "Constraint violations", "showTitle": true}
+            }
+          },
+          "position": {"x": 3, "y": 16, "width": 3, "height": 6}
+        }
+      ]
+    }
+  ]
+}
