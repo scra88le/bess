@@ -1,0 +1,29 @@
+# Tooling configuration for CI (black / ruff / mypy).
+# Pinned explicitly so local runs and GitHub Actions agree regardless of tool defaults.
+
+[tool.black]
+line-length = 88
+target-version = ["py312"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+# Deliberate, focused baseline: pycodestyle errors/warnings + pyflakes.
+# NOTE: pyupgrade (UP) rules are intentionally omitted — they rewrite
+# typing.Dict/List/Tuple to builtin generics, which conflicts with the
+# CLAUDE.md requirement to use `from typing import Dict, List, Tuple`.
+select = ["E", "F", "W"]
+# Line length is owned by black; don't let ruff double-flag lines black
+# deliberately leaves long (strings, long assert expressions).
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = false
+
+# Third-party libraries that ship no type stubs / py.typed marker.
+[[tool.mypy.overrides]]
+module = ["fsspec.*", "pyarrow.*", "pulp.*", "s3fs.*"]
+ignore_missing_imports = true

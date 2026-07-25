@@ -16,7 +16,7 @@ enforced is logged as a standard alarm block to stderr.
 from __future__ import annotations
 
 import sys
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from .battery import Battery
 from .config_loader import Config
@@ -29,8 +29,9 @@ EPS: float = 1e-9
 class DispatchEngine:
     """Drives the 1-second discrete step loop over a dispatch signal."""
 
-    def __init__(self, config: Config, battery: Battery,
-                 telemetry: Optional[Telemetry] = None) -> None:
+    def __init__(
+        self, config: Config, battery: Battery, telemetry: Optional[Telemetry] = None
+    ) -> None:
         self.config = config
         self.battery = battery
         self.telemetry = telemetry or Telemetry()
@@ -56,7 +57,7 @@ class DispatchEngine:
             self.step(float(injected), dt)
         return self.telemetry
 
-    def step(self, injected_mw: float, dt: float = DT_SECONDS) -> Dict[str, float]:
+    def step(self, injected_mw: float, dt: float = DT_SECONDS) -> Dict[str, Any]:
         """Advance one timestep externally (for the long-running runner).
 
         Returns the telemetry row. ``run()`` is just a loop over this.
@@ -70,7 +71,7 @@ class DispatchEngine:
         """Reset the within-day clock so outage windows recur each day."""
         self._day_t = 0
 
-    def _step(self, t: int, injected_mw: float, dt: float) -> Dict[str, float]:
+    def _step(self, t: int, injected_mw: float, dt: float) -> Dict[str, Any]:
         """Clamp one setpoint through every constraint and advance the battery."""
         setpoint = injected_mw
 
@@ -91,7 +92,7 @@ class DispatchEngine:
 
         self._prev_power_mw = actual
 
-        row: Dict[str, float] = {
+        row: Dict[str, Any] = {
             "timestamp_s": float(t),
             "injected_mw": injected_mw,
             "grid_limit_export_mw": self._max_export_mw,

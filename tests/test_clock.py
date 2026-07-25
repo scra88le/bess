@@ -13,12 +13,12 @@ def test_accelerated_runs_fast() -> None:
     start = dt.datetime(2026, 6, 13)
     clock = SimClock(start, time_scale=1_000_000.0)
     wall0 = time.monotonic()
-    for _ in range(600):                       # 600 sim-seconds
+    for _ in range(600):  # 600 sim-seconds
         clock.tick()
     wall_elapsed = time.monotonic() - wall0
     sim_elapsed = (clock.sim_now - start).total_seconds()
     assert sim_elapsed == 600.0
-    assert wall_elapsed < 0.5                  # negligible real time
+    assert wall_elapsed < 0.5  # negligible real time
 
 
 def test_second_minute_day_fields() -> None:
@@ -29,7 +29,7 @@ def test_second_minute_day_fields() -> None:
     for _ in range(59):
         clock.tick()
     assert clock.second_of_day == 59
-    assert clock.is_minute_end()               # last second of minute 0
+    assert clock.is_minute_end()  # last second of minute 0
     assert clock.minute_index == 0
     clock.tick()
     assert clock.minute_index == 1

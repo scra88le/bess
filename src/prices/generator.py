@@ -14,9 +14,15 @@ from .. import io_layout
 from .model import DateLike, PriceModel, SyntheticPriceModel, _as_date
 
 
-def generate(root: str, start: DateLike, days: int, *,
-             resolution_minutes: int = 30, seed: int = 0,
-             model: Optional[PriceModel] = None) -> List[str]:
+def generate(
+    root: str,
+    start: DateLike,
+    days: int,
+    *,
+    resolution_minutes: int = 30,
+    seed: int = 0,
+    model: Optional[PriceModel] = None,
+) -> List[str]:
     """Generate ``days`` daily forecasts and write them under ``root``.
 
     Returns the list of paths written. Raises ``ValueError`` on bad inputs.
@@ -36,7 +42,9 @@ def generate(root: str, start: DateLike, days: int, *,
         records = [
             {
                 "period": period,
-                "ts_utc": (day_start + dt.timedelta(minutes=period * resolution_minutes)).isoformat(),
+                "ts_utc": (
+                    day_start + dt.timedelta(minutes=period * resolution_minutes)
+                ).isoformat(),
                 "price_per_mwh": float(price),
                 "resolution_minutes": int(resolution_minutes),
             }

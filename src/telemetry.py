@@ -85,15 +85,20 @@ class Telemetry:
         )
 
         # 1. Power: target vs actual, bounded by grid limits.
-        ax_power.plot(t, self.column("injected_mw"), label="Target (injected)",
-                      color="tab:blue", alpha=0.7)
-        ax_power.plot(t, self.column("actual_mw"), label="Actual",
-                      color="tab:orange")
+        ax_power.plot(
+            t,
+            self.column("injected_mw"),
+            label="Target (injected)",
+            color="tab:blue",
+            alpha=0.7,
+        )
+        ax_power.plot(t, self.column("actual_mw"), label="Actual", color="tab:orange")
         export = self.column("grid_limit_export_mw")
         imp = self.column("grid_limit_import_mw")
         if any(v is not None for v in export):
-            ax_power.plot(t, export, "--", color="grey", linewidth=0.8,
-                          label="Grid limits")
+            ax_power.plot(
+                t, export, "--", color="grey", linewidth=0.8, label="Grid limits"
+            )
             ax_power.plot(t, imp, "--", color="grey", linewidth=0.8)
         ax_power.axhline(0.0, color="black", linewidth=0.5)
         ax_power.set_ylabel("Power (MW)")
@@ -107,22 +112,33 @@ class Telemetry:
         ax_soc.set_ylim(0, 100)
 
         # 3. Cell vs ambient temperature.
-        ax_temp.plot(t, self.column("cell_temp_c"), label="Cell",
-                     color="tab:red")
-        ax_temp.plot(t, self.column("ambient_temp_c"), label="Ambient",
-                     color="tab:cyan", linestyle="--")
+        ax_temp.plot(t, self.column("cell_temp_c"), label="Cell", color="tab:red")
+        ax_temp.plot(
+            t,
+            self.column("ambient_temp_c"),
+            label="Ambient",
+            color="tab:cyan",
+            linestyle="--",
+        )
         ax_temp.set_ylabel("Temp (°C)")
         ax_temp.legend(loc="upper right", fontsize="small")
 
         # 4. Degradation: capacity loss with EFC on a twin axis.
-        loss_pct = [v * 100.0 if v is not None else None
-                    for v in self.column("capacity_loss_fraction")]
+        loss_pct = [
+            v * 100.0 if v is not None else None
+            for v in self.column("capacity_loss_fraction")
+        ]
         ax_deg.plot(t, loss_pct, color="tab:purple", label="Capacity loss")
         ax_deg.set_ylabel("Capacity loss (%)")
         ax_deg.set_xlabel("Time (s)")
         ax_efc = ax_deg.twinx()
-        ax_efc.plot(t, self.column("equivalent_full_cycles"),
-                    color="tab:brown", linestyle=":", label="EFC")
+        ax_efc.plot(
+            t,
+            self.column("equivalent_full_cycles"),
+            color="tab:brown",
+            linestyle=":",
+            label="EFC",
+        )
         ax_efc.set_ylabel("Equivalent full cycles")
 
         fig.tight_layout()

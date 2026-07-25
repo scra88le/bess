@@ -1,0 +1,8 @@
+# Dev/CI-only tooling (kept out of requirements.txt so it stays out of the image).
+-r requirements.txt
+
+pytest
+black
+ruff
+mypy
+types-PyYAML

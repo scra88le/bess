@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import datetime as dt
 
 import pytest
 
@@ -43,8 +42,8 @@ def test_invalid_resolution_raises(bad) -> None:
 def test_profile_has_arbitrage_shape() -> None:
     """Evening peak should exceed the overnight trough (so arbitrage exists)."""
     prices = SyntheticPriceModel(noise_std=0.0).prices("2026-06-13", 60)
-    overnight = prices[3]          # ~03:00
-    evening = prices[18]           # ~18:00
+    overnight = prices[3]  # ~03:00
+    evening = prices[18]  # ~18:00
     assert evening > overnight
 
 
@@ -56,7 +55,12 @@ def test_generate_writes_partitioned_files(tmp_path) -> None:
 
     records = io_layout.read_table(paths[0])
     assert len(records) == 48
-    assert set(records[0]) == {"period", "ts_utc", "price_per_mwh", "resolution_minutes"}
+    assert set(records[0]) == {
+        "period",
+        "ts_utc",
+        "price_per_mwh",
+        "resolution_minutes",
+    }
     assert records[0]["period"] == 0
     assert records[-1]["period"] == 47
     assert records[0]["resolution_minutes"] == 30

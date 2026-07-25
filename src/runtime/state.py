@@ -18,8 +18,13 @@ from ..dispatch_engine import DispatchEngine
 SCHEMA_VERSION = 1
 
 
-def save(root: str, battery: Battery, engine: DispatchEngine, sim_now: dt.datetime,
-         time_scale: float) -> None:
+def save(
+    root: str,
+    battery: Battery,
+    engine: DispatchEngine,
+    sim_now: dt.datetime,
+    time_scale: float,
+) -> None:
     obj: Dict[str, Any] = {
         "schema_version": SCHEMA_VERSION,
         "battery_state": dataclasses.asdict(battery.state),
@@ -34,8 +39,9 @@ def load(root: str) -> Optional[Dict[str, Any]]:
     return io_layout.read_json(io_layout.state_path(root))
 
 
-def apply(checkpoint: Dict[str, Any], battery: Battery,
-          engine: DispatchEngine) -> dt.datetime:
+def apply(
+    checkpoint: Dict[str, Any], battery: Battery, engine: DispatchEngine
+) -> dt.datetime:
     """Restore state onto fresh objects; return the saved sim time."""
     battery.state = BatteryState(**checkpoint["battery_state"])
     engine._prev_power_mw = checkpoint["engine"]["prev_power_mw"]

@@ -33,8 +33,7 @@ def _periods_per_day(resolution_minutes: int) -> int:
 class PriceModel(Protocol):
     """Produces a £/MWh price for each period of a day."""
 
-    def prices(self, date: DateLike, resolution_minutes: int) -> List[float]:
-        ...
+    def prices(self, date: DateLike, resolution_minutes: int) -> List[float]: ...
 
 
 def _gaussian(x: np.ndarray, mu: float, sigma: float) -> np.ndarray:
@@ -44,9 +43,15 @@ def _gaussian(x: np.ndarray, mu: float, sigma: float) -> np.ndarray:
 class SyntheticPriceModel:
     """Deterministic synthetic DA price forecast with a daily arbitrage shape."""
 
-    def __init__(self, seed: int = 0, base: float = 50.0,
-                 morning_peak: float = 40.0, evening_peak: float = 60.0,
-                 overnight_dip: float = 15.0, noise_std: float = 4.0) -> None:
+    def __init__(
+        self,
+        seed: int = 0,
+        base: float = 50.0,
+        morning_peak: float = 40.0,
+        evening_peak: float = 60.0,
+        overnight_dip: float = 15.0,
+        noise_std: float = 4.0,
+    ) -> None:
         self.seed = seed
         self.base = base
         self.morning_peak = morning_peak
@@ -72,4 +77,4 @@ class SyntheticPriceModel:
 
     def _seed_for(self, date: DateLike) -> int:
         """Per-date seed: a given (seed, date) always yields the same series."""
-        return (self.seed * 1_000_003 + _as_date(date).toordinal()) % (2 ** 32)
+        return (self.seed * 1_000_003 + _as_date(date).toordinal()) % (2**32)

@@ -5,8 +5,20 @@ from __future__ import annotations
 from src.runtime.aggregator import MinuteAggregator
 
 
-def _row(actual_mw, *, soc=0.5, temp=25.0, target=None, reason="",
-         efc=0.0, loss=0.0, throughput=0.0, warranty=0.0, aux=0.05, rloss=0.0):
+def _row(
+    actual_mw,
+    *,
+    soc=0.5,
+    temp=25.0,
+    target=None,
+    reason="",
+    efc=0.0,
+    loss=0.0,
+    throughput=0.0,
+    warranty=0.0,
+    aux=0.05,
+    rloss=0.0,
+):
     return {
         "actual_mw": actual_mw,
         "target_mw": actual_mw if target is None else target,
@@ -33,14 +45,14 @@ def test_energy_sums_and_end_of_minute_values() -> None:
 
     assert rec["date"] == "2026-06-13"
     assert rec["minute_index"] == 5
-    assert rec["mwh_discharged"] == 36.0 * 30 / 3600.0   # 0.30
+    assert rec["mwh_discharged"] == 36.0 * 30 / 3600.0  # 0.30
     assert rec["mwh_charged"] == 36.0 * 30 / 3600.0
     assert rec["mean_power_mw"] == 0.0
     assert rec["peak_discharge_mw"] == 36.0
     assert rec["peak_charge_mw"] == 36.0
-    assert rec["soc_end"] == 0.55                        # last row
+    assert rec["soc_end"] == 0.55  # last row
     assert rec["cell_temp_c_end"] == 29.0
-    assert agg.is_empty()                                # reset after flush
+    assert agg.is_empty()  # reset after flush
 
 
 def test_violation_counts_by_reason() -> None:
