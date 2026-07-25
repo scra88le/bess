@@ -27,6 +27,7 @@ import fsspec
 try:  # Parquet preferred; JSONL fallback keeps the contract portable.
     import pyarrow as _pa
     import pyarrow.parquet as _pq
+
     _HAVE_PARQUET = True
 except ImportError:  # pragma: no cover - exercised only without pyarrow
     _HAVE_PARQUET = False
@@ -64,8 +65,10 @@ def schedule_path(root: str, date: DateLike) -> str:
 
 
 def telemetry_path(root: str, date: DateLike, minute_index: int) -> str:
-    return (f"{_base(root)}/telemetry/date={_norm_date(date)}/"
-            f"part-{int(minute_index):04d}.{TABLE_EXT}")
+    return (
+        f"{_base(root)}/telemetry/date={_norm_date(date)}/"
+        f"part-{int(minute_index):04d}.{TABLE_EXT}"
+    )
 
 
 def state_path(root: str) -> str:

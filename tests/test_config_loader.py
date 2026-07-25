@@ -73,20 +73,25 @@ def test_missing_required_key_raises(tmp_path) -> None:
 
 
 def test_missing_nested_key_raises(tmp_path) -> None:
-    data = {**VALID, "thermal": {k: v for k, v in VALID["thermal"].items()
-                                 if k != "thermal_mass"}}
+    data = {
+        **VALID,
+        "thermal": {k: v for k, v in VALID["thermal"].items() if k != "thermal_mass"},
+    }
     with pytest.raises(ConfigError, match="thermal.thermal_mass"):
         load_config(write(tmp_path, data))
 
 
-@pytest.mark.parametrize("overrides, match", [
-    ({"efficiency": 0.0}, "efficiency"),
-    ({"efficiency": 1.5}, "efficiency"),
-    ({"nominal_capacity_mwh": 0.0}, "nominal_capacity_mwh"),
-    ({"initial_soc": 1.2}, "initial_soc"),
-    ({"initial_soc": -0.1}, "initial_soc"),
-    ({"ramping_limit_mw_per_sec": -1.0}, "ramping_limit"),
-])
+@pytest.mark.parametrize(
+    "overrides, match",
+    [
+        ({"efficiency": 0.0}, "efficiency"),
+        ({"efficiency": 1.5}, "efficiency"),
+        ({"nominal_capacity_mwh": 0.0}, "nominal_capacity_mwh"),
+        ({"initial_soc": 1.2}, "initial_soc"),
+        ({"initial_soc": -0.1}, "initial_soc"),
+        ({"ramping_limit_mw_per_sec": -1.0}, "ramping_limit"),
+    ],
+)
 def test_out_of_range_scalars_raise(tmp_path, overrides, match) -> None:
     data = {**VALID, **overrides}
     with pytest.raises(ConfigError, match=match):
@@ -94,9 +99,14 @@ def test_out_of_range_scalars_raise(tmp_path, overrides, match) -> None:
 
 
 def test_threshold_ordering_enforced(tmp_path) -> None:
-    data = {**VALID, "soc_non_linearity": {
-        "lower_threshold": 0.9, "upper_threshold": 0.1, "exponential_factor": 2.5,
-    }}
+    data = {
+        **VALID,
+        "soc_non_linearity": {
+            "lower_threshold": 0.9,
+            "upper_threshold": 0.1,
+            "exponential_factor": 2.5,
+        },
+    }
     with pytest.raises(ConfigError, match="lower_threshold must be < upper_threshold"):
         load_config(write(tmp_path, data))
 
@@ -107,13 +117,16 @@ def test_non_numeric_value_raises(tmp_path) -> None:
         load_config(write(tmp_path, data))
 
 
-@pytest.mark.parametrize("outages", [
-    [[10, 5]],            # start > end
-    [[-1, 5]],            # negative offset
-    [[1, 2, 3]],          # wrong arity
-    [[1.5, 2.0]],         # non-integer seconds
-    "not-a-list",
-])
+@pytest.mark.parametrize(
+    "outages",
+    [
+        [[10, 5]],  # start > end
+        [[-1, 5]],  # negative offset
+        [[1, 2, 3]],  # wrong arity
+        [[1.5, 2.0]],  # non-integer seconds
+        "not-a-list",
+    ],
+)
 def test_invalid_outages_raise(tmp_path, outages) -> None:
     data = {**VALID, "planned_outages": outages}
     with pytest.raises(ConfigError):

@@ -64,42 +64,105 @@ def test_generate_optimise_run_end_to_end(tmp_path) -> None:
     runner = CliRunner()
     root = str(tmp_path)
 
-    r = runner.invoke(main.cli, ["generate-prices", "--root", root,
-                                 "--start", "2026-06-13", "--days", "1", "--seed", "7"])
+    r = runner.invoke(
+        main.cli,
+        [
+            "generate-prices",
+            "--root",
+            root,
+            "--start",
+            "2026-06-13",
+            "--days",
+            "1",
+            "--seed",
+            "7",
+        ],
+    )
     assert r.exit_code == 0, r.output
 
-    r = runner.invoke(main.cli, ["optimise", "--root", root,
-                                 "--config", "config.yaml", "--date", "2026-06-13"])
+    r = runner.invoke(
+        main.cli,
+        ["optimise", "--root", root, "--config", "config.yaml", "--date", "2026-06-13"],
+    )
     assert r.exit_code == 0, r.output
     assert "objective" in r.output
 
-    r = runner.invoke(main.cli, ["run", "--root", root, "--config", "config.yaml",
-                                 "--start", "2026-06-13T23:58:00", "--days", "1",
-                                 "--time-scale", "1000000"])
+    r = runner.invoke(
+        main.cli,
+        [
+            "run",
+            "--root",
+            root,
+            "--config",
+            "config.yaml",
+            "--start",
+            "2026-06-13T23:58:00",
+            "--days",
+            "1",
+            "--time-scale",
+            "1000000",
+        ],
+    )
     assert r.exit_code == 0, r.output
     assert "minute record" in r.output
 
 
 def test_run_missing_schedule_errors(tmp_path) -> None:
     """Running a day with no schedule exits non-zero (no silent fallback)."""
-    result = CliRunner().invoke(main.cli, ["run", "--root", str(tmp_path),
-                                           "--config", "config.yaml",
-                                           "--start", "2026-06-13", "--days", "1",
-                                           "--time-scale", "1000000"])
+    result = CliRunner().invoke(
+        main.cli,
+        [
+            "run",
+            "--root",
+            str(tmp_path),
+            "--config",
+            "config.yaml",
+            "--start",
+            "2026-06-13",
+            "--days",
+            "1",
+            "--time-scale",
+            "1000000",
+        ],
+    )
     assert result.exit_code != 0
 
 
 def test_optimise_days_range(tmp_path) -> None:
     """optimise --days plans consecutive days in one invocation."""
-    import datetime as dt
 
     from src import io_layout
+
     runner = CliRunner()
     root = str(tmp_path)
-    runner.invoke(main.cli, ["generate-prices", "--root", root,
-                             "--start", "2026-06-13", "--days", "3", "--seed", "1"])
-    r = runner.invoke(main.cli, ["optimise", "--root", root, "--config", "config.yaml",
-                                 "--date", "2026-06-13", "--days", "3"])
+    runner.invoke(
+        main.cli,
+        [
+            "generate-prices",
+            "--root",
+            root,
+            "--start",
+            "2026-06-13",
+            "--days",
+            "3",
+            "--seed",
+            "1",
+        ],
+    )
+    r = runner.invoke(
+        main.cli,
+        [
+            "optimise",
+            "--root",
+            root,
+            "--config",
+            "config.yaml",
+            "--date",
+            "2026-06-13",
+            "--days",
+            "3",
+        ],
+    )
     assert r.exit_code == 0, r.output
     for d in ("2026-06-13", "2026-06-14", "2026-06-15"):
         assert io_layout.exists(io_layout.schedule_path(root, d))
@@ -110,10 +173,13 @@ def test_default_dates_today_and_tomorrow(tmp_path) -> None:
     import datetime as dt
 
     from src import io_layout
+
     runner = CliRunner()
     root = str(tmp_path)
 
-    r = runner.invoke(main.cli, ["generate-prices", "--root", root, "--days", "3", "--seed", "1"])
+    r = runner.invoke(
+        main.cli, ["generate-prices", "--root", root, "--days", "3", "--seed", "1"]
+    )
     assert r.exit_code == 0, r.output
     today = dt.date.today()
     assert io_layout.exists(io_layout.prices_path(root, today.isoformat()))

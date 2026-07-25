@@ -45,13 +45,13 @@ def make_battery(**overrides) -> Battery:
 def test_soc_stays_within_bounds() -> None:
     """SoC must never leave [0, 1] regardless of how hard we push."""
     battery = make_battery(initial_soc=0.05)
-    for _ in range(10_000):           # sustained heavy discharge
+    for _ in range(10_000):  # sustained heavy discharge
         battery.step(40.0)
         assert 0.0 <= battery.state.soc <= 1.0
-    assert battery.state.soc == 0.0   # pinned at the floor
+    assert battery.state.soc == 0.0  # pinned at the floor
 
     battery = make_battery(initial_soc=0.95)
-    for _ in range(10_000):           # sustained heavy charge
+    for _ in range(10_000):  # sustained heavy charge
         battery.step(-40.0)
         assert 0.0 <= battery.state.soc <= 1.0
     assert battery.state.soc == 1.0
@@ -71,7 +71,9 @@ def test_efficiency_applied_per_direction() -> None:
     aux_charge = charger.auxiliary_load_mw()
     soc0 = charger.state.soc
     charger.step(-p, dt)
-    cap = charger.config.nominal_capacity_mwh * (1.0 - charger.state.capacity_loss_fraction)
+    cap = charger.config.nominal_capacity_mwh * (
+        1.0 - charger.state.capacity_loss_fraction
+    )
     # Δsoc = (-batt_in - aux) / cap  ->  batt cell energy gained:
     gained = (charger.state.soc - soc0) * cap + aux_charge * dt / 3600.0
 

@@ -67,6 +67,7 @@ def test_build_figure_has_four_subplots() -> None:
     # Four stacked telemetry axes (+ one twin axis on the degradation panel).
     assert len(fig.axes) == 5
     import matplotlib.pyplot as plt
+
     plt.close(fig)
 
 

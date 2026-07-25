@@ -36,15 +36,22 @@ class Config:
 # Required nested keys per section. Optional keys (thermal.optimal_temp_c,
 # thermal.max_cell_temp_c, degradation.*) are validated only when present.
 _REQUIRED_SECTIONS: Dict[str, Tuple[str, ...]] = {
-    "thermal": ("initial_temp_c", "ambient_temp_c", "thermal_mass",
-                "hvac_cooling_rate_c_per_sec"),
+    "thermal": (
+        "initial_temp_c",
+        "ambient_temp_c",
+        "thermal_mass",
+        "hvac_cooling_rate_c_per_sec",
+    ),
     "soc_non_linearity": ("lower_threshold", "upper_threshold", "exponential_factor"),
     "auxiliary_load_kw": ("base", "hvac_per_degree"),
     "grid_constraints": ("max_export_mw", "max_import_mw"),
     "warranty": ("max_equivalent_full_cycles",),
 }
 _REQUIRED_SCALARS: Tuple[str, ...] = (
-    "nominal_capacity_mwh", "initial_soc", "efficiency", "ramping_limit_mw_per_sec",
+    "nominal_capacity_mwh",
+    "initial_soc",
+    "efficiency",
+    "ramping_limit_mw_per_sec",
 )
 
 
@@ -66,7 +73,9 @@ def load_config(path: str) -> Config:
         raise ConfigError(f"Invalid YAML in {path}: {exc}") from exc
 
     if not isinstance(raw, dict):
-        raise ConfigError(f"Configuration in {path} must be a mapping, got {type(raw).__name__}")
+        raise ConfigError(
+            f"Configuration in {path} must be a mapping, got {type(raw).__name__}"
+        )
 
     _validate(raw)
 
@@ -172,8 +181,14 @@ def _non_negative(block: Dict[str, Any], key: str, section: str = "") -> None:
         raise ConfigError(f"{_qualify(key, section)} must be >= 0, got {block[key]}")
 
 
-def _in_range(block: Dict[str, Any], key: str, lo: float, hi: float,
-             section: str = "", lo_inclusive: bool = True) -> None:
+def _in_range(
+    block: Dict[str, Any],
+    key: str,
+    lo: float,
+    hi: float,
+    section: str = "",
+    lo_inclusive: bool = True,
+) -> None:
     value = _number(block, key, section)
     low_ok = value >= lo if lo_inclusive else value > lo
     if not (low_ok and value <= hi):
@@ -203,8 +218,12 @@ def _parse_outages(raw_outages: Any) -> List[Tuple[int, int]]:
                     f"planned_outages[{i}] {label} must be an integer second, got {val!r}"
                 )
         if start < 0 or end < 0:
-            raise ConfigError(f"planned_outages[{i}] offsets must be >= 0, got {window!r}")
+            raise ConfigError(
+                f"planned_outages[{i}] offsets must be >= 0, got {window!r}"
+            )
         if start > end:
-            raise ConfigError(f"planned_outages[{i}] start must be <= end, got {window!r}")
+            raise ConfigError(
+                f"planned_outages[{i}] start must be <= end, got {window!r}"
+            )
         windows.append((int(start), int(end)))
     return windows

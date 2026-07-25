@@ -32,7 +32,9 @@ def _as_datetime(start: StartLike) -> dt.datetime:
     return dt.datetime.fromisoformat(start)
 
 
-def run(config: Config, runner_config: RunnerConfig, start: StartLike) -> Dict[str, Any]:
+def run(
+    config: Config, runner_config: RunnerConfig, start: StartLike
+) -> Dict[str, Any]:
     """Run the simulator, consuming daily schedules and emitting minute telemetry.
 
     Returns a summary dict. Raises ``MissingArtifactError`` if a required day's
@@ -56,7 +58,7 @@ def run(config: Config, runner_config: RunnerConfig, start: StartLike) -> Dict[s
 
     while runner_config.days is None or days_run < runner_config.days:
         date = clock.date
-        schedule = Schedule.read(root, date)        # raises MissingArtifactError if absent
+        schedule = Schedule.read(root, date)  # raises MissingArtifactError if absent
         engine.begin_day()
 
         while clock.date == date:
@@ -66,7 +68,7 @@ def run(config: Config, runner_config: RunnerConfig, start: StartLike) -> Dict[s
             minute_end = clock.is_minute_end()
             minute_index = clock.minute_index
             minute_ts = clock.minute_start().isoformat()
-            clock.tick()                            # advance first so checkpoint points at next second
+            clock.tick()  # advance first so checkpoint points at next second
 
             if minute_end:
                 record = aggregator.flush(date.isoformat(), minute_index, minute_ts)

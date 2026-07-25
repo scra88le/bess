@@ -34,22 +34,26 @@ class OptimisationError(RuntimeError):
 class OptimiseOptions:
     """Tunable optimisation parameters (kept out of the physics Config)."""
 
-    terminal_soc: Optional[float] = None      # default = initial_soc
-    degradation_cost: float = 0.0             # £/MWh penalty on throughput
-    soc_terminal_tol: float = 1e-3            # band around terminal SoC
-    capacity_loss_fraction: float = 0.0       # plan against today's degraded capacity
+    terminal_soc: Optional[float] = None  # default = initial_soc
+    degradation_cost: float = 0.0  # £/MWh penalty on throughput
+    soc_terminal_tol: float = 1e-3  # band around terminal SoC
+    capacity_loss_fraction: float = 0.0  # plan against today's degraded capacity
 
 
-def optimise(config: Config, prices: List[float], resolution_minutes: int,
-             options: Optional[OptimiseOptions] = None,
-             date: Optional[str] = None) -> Schedule:
+def optimise(
+    config: Config,
+    prices: List[float],
+    resolution_minutes: int,
+    options: Optional[OptimiseOptions] = None,
+    date: Optional[str] = None,
+) -> Schedule:
     """Solve the day-ahead arbitrage LP and return the optimal schedule."""
     opts = options or OptimiseOptions()
     n = len(prices)
     if n == 0:
         raise OptimisationError("price forecast is empty")
 
-    h = resolution_minutes / 60.0                                   # period length, hours
+    h = resolution_minutes / 60.0  # period length, hours
     eta = config.efficiency
     capacity = config.nominal_capacity_mwh * (1.0 - opts.capacity_loss_fraction)
     soc0 = config.initial_soc
@@ -67,14 +71,23 @@ def optimise(config: Config, prices: List[float], resolution_minutes: int,
         warnings.simplefilter("ignore", DeprecationWarning)
 
         prob = pulp.LpProblem("da_arbitrage", pulp.LpMaximize)
-        dis = [pulp.LpVariable(f"dis_{t}", lowBound=0, upBound=max_dis) for t in range(n)]
-        chg = [pulp.LpVariable(f"chg_{t}", lowBound=0, upBound=max_chg) for t in range(n)]
-        soc = [pulp.LpVariable(f"soc_{t}", lowBound=s_lo, upBound=s_hi) for t in range(n)]
+        dis = [
+            pulp.LpVariable(f"dis_{t}", lowBound=0, upBound=max_dis) for t in range(n)
+        ]
+        chg = [
+            pulp.LpVariable(f"chg_{t}", lowBound=0, upBound=max_chg) for t in range(n)
+        ]
+        soc = [
+            pulp.LpVariable(f"soc_{t}", lowBound=s_lo, upBound=s_hi) for t in range(n)
+        ]
 
         # SoC dynamics (mirrors the battery's per-direction efficiency).
         for t in range(n):
             prev = soc[t - 1] if t > 0 else soc0
-            prob += soc[t] == prev - (dis[t] / eta) * h / capacity + (chg[t] * eta) * h / capacity
+            prob += (
+                soc[t]
+                == prev - (dis[t] / eta) * h / capacity + (chg[t] * eta) * h / capacity
+            )
 
         # Terminal SoC as a tight band (equality can be infeasible on coarse grids).
         prob += soc[n - 1] >= terminal - opts.soc_terminal_tol
@@ -88,7 +101,9 @@ def optimise(config: Config, prices: List[float], resolution_minutes: int,
         status = prob.solve(pulp.PULP_CBC_CMD(msg=False))
 
     if pulp.LpStatus[status] != "Optimal":
-        raise OptimisationError(f"LP did not solve to optimality: {pulp.LpStatus[status]}")
+        raise OptimisationError(
+            f"LP did not solve to optimality: {pulp.LpStatus[status]}"
+        )
 
     power_mw: List[float] = []
     for t in range(n):

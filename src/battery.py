@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Dict, Optional
+from typing import Any, Dict
 
 from .config_loader import Config
 
@@ -32,8 +32,8 @@ KW_PER_MW: float = 1000.0
 class BatteryState:
     """Snapshot of dynamic state variables at a single timestep."""
 
-    soc: float                  # state of charge, fraction [0, 1]
-    cell_temp_c: float          # cell temperature
+    soc: float  # state of charge, fraction [0, 1]
+    cell_temp_c: float  # cell temperature
     cumulative_throughput_mwh: float = 0.0
     equivalent_full_cycles: float = 0.0
     capacity_loss_fraction: float = 0.0
@@ -53,7 +53,7 @@ class Battery:
     # ------------------------------------------------------------------ #
     # Main step
     # ------------------------------------------------------------------ #
-    def step(self, target_power_mw: float, dt: float = 1.0) -> Dict[str, float]:
+    def step(self, target_power_mw: float, dt: float = 1.0) -> Dict[str, Any]:
         """Advance the battery one timestep under a target power setpoint.
 
         Returns a telemetry dict describing the resulting state and the actual
@@ -63,7 +63,6 @@ class Battery:
         """
         cfg = self.config
         st = self.state
-        eta = cfg.efficiency
         dt_h = dt / SECONDS_PER_HOUR
 
         # Effective capacity shrinks as the cells degrade.
@@ -95,7 +94,7 @@ class Battery:
             desired *= factor
 
         # --- Energy bookkeeping at the cells --------------------------- #
-        cell_power = self._cell_power(desired)            # +ve = leaving cells
+        cell_power = self._cell_power(desired)  # +ve = leaving cells
         batt_cell_energy = cell_power * dt_h
         aux_energy = aux_mw * dt_h
         soc_raw = st.soc - (batt_cell_energy + aux_energy) / capacity_mwh
@@ -112,9 +111,9 @@ class Battery:
 
         # Aux load has priority (it always runs); the battery absorbs the clamp.
         actual_batt_cell_energy = (st.soc - soc_new) * capacity_mwh - aux_energy
-        if desired > 0.0:        # discharge: cells can only give energy
+        if desired > 0.0:  # discharge: cells can only give energy
             actual_batt_cell_energy = max(0.0, actual_batt_cell_energy)
-        elif desired < 0.0:      # charge: cells can only take energy (negative)
+        elif desired < 0.0:  # charge: cells can only take energy (negative)
             actual_batt_cell_energy = min(0.0, actual_batt_cell_energy)
         else:
             actual_batt_cell_energy = 0.0
@@ -185,23 +184,24 @@ class Battery:
     def _cell_power(self, grid_power_mw: float) -> float:
         """Cell-side power for a grid-side setpoint (+ve = leaving the cells)."""
         eta = self.config.efficiency
-        if grid_power_mw > 0.0:      # discharge: cells must supply more
+        if grid_power_mw > 0.0:  # discharge: cells must supply more
             return grid_power_mw / eta
-        if grid_power_mw < 0.0:      # charge: less reaches the cells
+        if grid_power_mw < 0.0:  # charge: less reaches the cells
             return grid_power_mw * eta
         return 0.0
 
     def _grid_power(self, cell_power_mw: float) -> float:
         """Grid-side power for a cell-side flow (inverse of ``_cell_power``)."""
         eta = self.config.efficiency
-        if cell_power_mw > 0.0:      # discharge
+        if cell_power_mw > 0.0:  # discharge
             return cell_power_mw * eta
-        if cell_power_mw < 0.0:      # charge
+        if cell_power_mw < 0.0:  # charge
             return cell_power_mw / eta
         return 0.0
 
-    def _update_thermal(self, resistive_loss_mw: float, dt: float,
-                        optimal_temp_c: float) -> None:
+    def _update_thermal(
+        self, resistive_loss_mw: float, dt: float, optimal_temp_c: float
+    ) -> None:
         """Update cell temperature from I^2R heating then HVAC cooling.
 
         All resistive (efficiency) loss becomes heat: ``dT = Q / thermal_mass``.
@@ -233,19 +233,26 @@ class Battery:
 
         deg = cfg.degradation
         cycle_loss_per_efc = float(deg.get("cycle_loss_per_efc", 0.20 / max_efc))
-        calendar_per_sec = float(deg.get("calendar_loss_per_year", 0.0)) / SECONDS_PER_YEAR
+        calendar_per_sec = (
+            float(deg.get("calendar_loss_per_year", 0.0)) / SECONDS_PER_YEAR
+        )
 
         st.capacity_loss_fraction = min(
             0.9999,
-            st.capacity_loss_fraction + cycle_loss_per_efc * efc_delta + calendar_per_sec * dt,
+            st.capacity_loss_fraction
+            + cycle_loss_per_efc * efc_delta
+            + calendar_per_sec * dt,
         )
         st.warranty_breached = st.equivalent_full_cycles > max_efc
 
     def auxiliary_load_mw(self) -> float:
         """Base load plus dynamic HVAC load scaled by temperature deviation."""
         aux = self.config.auxiliary_load_kw
-        optimal = float(self.config.thermal.get("optimal_temp_c",
-                                                self.config.thermal["ambient_temp_c"]))
+        optimal = float(
+            self.config.thermal.get(
+                "optimal_temp_c", self.config.thermal["ambient_temp_c"]
+            )
+        )
         deviation = max(0.0, self.state.cell_temp_c - optimal)
         kw = aux["base"] + aux["hvac_per_degree"] * deviation
         return kw / KW_PER_MW

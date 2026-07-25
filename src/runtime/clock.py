@@ -13,8 +13,9 @@ import time
 
 
 class SimClock:
-    def __init__(self, start: dt.datetime, time_scale: float = 1.0,
-                 dt_seconds: float = 1.0) -> None:
+    def __init__(
+        self, start: dt.datetime, time_scale: float = 1.0, dt_seconds: float = 1.0
+    ) -> None:
         self.sim_now = start
         self.time_scale = float(time_scale)
         self.dt = float(dt_seconds)
@@ -46,6 +47,8 @@ class SimClock:
         self.sim_now += dt.timedelta(seconds=self.dt)
         if self.time_scale > 0:
             sim_elapsed = (self.sim_now - self._sim_start).total_seconds()
-            delay = (self._wall_start + sim_elapsed / self.time_scale) - time.monotonic()
+            delay = (
+                self._wall_start + sim_elapsed / self.time_scale
+            ) - time.monotonic()
             if delay > 0:
                 time.sleep(delay)

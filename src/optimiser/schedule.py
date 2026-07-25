@@ -34,7 +34,11 @@ class Schedule:
         if self.date is None:
             raise ValueError("Schedule.date must be set before writing")
         records = [
-            {"period": i, "power_mw": float(p), "resolution_minutes": self.resolution_minutes}
+            {
+                "period": i,
+                "power_mw": float(p),
+                "resolution_minutes": self.resolution_minutes,
+            }
             for i, p in enumerate(self.power_mw)
         ]
         path = io_layout.schedule_path(root, self.date)

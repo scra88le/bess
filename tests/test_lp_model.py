@@ -14,11 +14,19 @@ BASE = Config(
     initial_soc=0.50,
     efficiency=0.92,
     ramping_limit_mw_per_sec=2.0,
-    thermal={"initial_temp_c": 25.0, "ambient_temp_c": 20.0, "thermal_mass": 3.0e8,
-             "hvac_cooling_rate_c_per_sec": 0.05, "optimal_temp_c": 20.0,
-             "max_cell_temp_c": 60.0},
-    soc_non_linearity={"lower_threshold": 0.10, "upper_threshold": 0.90,
-                       "exponential_factor": 2.5},
+    thermal={
+        "initial_temp_c": 25.0,
+        "ambient_temp_c": 20.0,
+        "thermal_mass": 3.0e8,
+        "hvac_cooling_rate_c_per_sec": 0.05,
+        "optimal_temp_c": 20.0,
+        "max_cell_temp_c": 60.0,
+    },
+    soc_non_linearity={
+        "lower_threshold": 0.10,
+        "upper_threshold": 0.90,
+        "exponential_factor": 2.5,
+    },
     auxiliary_load_kw={"base": 50.0, "hvac_per_degree": 10.0},
     grid_constraints={"max_export_mw": 45.0, "max_import_mw": 45.0},
     warranty={"max_equivalent_full_cycles": 3000},
@@ -55,7 +63,7 @@ def _reconstruct_soc(config: Config, sched: Schedule):
 def test_solves_and_arbitrages() -> None:
     sched = optimise(cfg(), PRICES, RES)
     assert len(sched.power_mw) == 24
-    assert sched.objective_value > 0                     # captured arbitrage
+    assert sched.objective_value > 0  # captured arbitrage
     # Charges (power < 0) in the cheap half, discharges (> 0) in the expensive half.
     assert min(sched.power_mw[:12]) < 0
     assert max(sched.power_mw[12:]) > 0
@@ -86,7 +94,10 @@ def test_custom_terminal_soc() -> None:
 def test_degradation_cost_reduces_throughput() -> None:
     free = optimise(cfg(), PRICES, RES, OptimiseOptions(degradation_cost=0.0))
     taxed = optimise(cfg(), PRICES, RES, OptimiseOptions(degradation_cost=1000.0))
-    tp = lambda s: sum(abs(p) for p in s.power_mw)
+
+    def tp(s):
+        return sum(abs(p) for p in s.power_mw)
+
     assert tp(taxed) <= tp(free)
 
 
@@ -100,20 +111,22 @@ def test_flat_prices_no_arbitrage() -> None:
     active = optimise(cfg(), PRICES, RES)
     flat_tp = sum(abs(p) for p in flat.power_mw)
     active_tp = sum(abs(p) for p in active.power_mw)
-    assert flat_tp < 1.0                        # negligible vs ...
-    assert active_tp > 20.0                     # ... a real arbitrage cycle
+    assert flat_tp < 1.0  # negligible vs ...
+    assert active_tp > 20.0  # ... a real arbitrage cycle
 
 
 def test_empty_prices_raises() -> None:
     from src.optimiser import OptimisationError
+
     with pytest.raises(OptimisationError):
         optimise(cfg(), [], RES)
 
 
 def test_schedule_power_at_second() -> None:
-    sched = Schedule(date="2026-06-13", resolution_minutes=60,
-                     power_mw=[5.0, -3.0], terminal_soc=0.5)
+    sched = Schedule(
+        date="2026-06-13", resolution_minutes=60, power_mw=[5.0, -3.0], terminal_soc=0.5
+    )
     assert sched.power_at_second(0) == 5.0
     assert sched.power_at_second(3599) == 5.0
     assert sched.power_at_second(3600) == -3.0
-    assert sched.power_at_second(999999) == -3.0       # clamped to last period
+    assert sched.power_at_second(999999) == -3.0  # clamped to last period
